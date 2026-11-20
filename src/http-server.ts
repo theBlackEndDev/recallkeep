@@ -493,6 +493,24 @@ async function route(req: Request): Promise<Response> {
   }
 }
 
+// ─── Warm-up ────────────────────────────────────────────────────
+// The first recall after a start took about 1.6s against a 25k-message store
+// (database connection, embedding client TLS, vector index pages), while a warm
+// one takes about 0.5s. Clients such as the pi extension give up after 800ms, so
+// the first search of the day looked like "no match". Run the real recall paths
+// once before accepting requests. Never fatal: with the database down the server
+// still starts, and the cap keeps a slow warm-up from delaying startup.
+async function warmUp(): Promise<void> {
+  const started = Date.now();
+  const work = Promise.allSettled([
+    recall({ query: "warm up", limit: 1 }),
+    recallMessages({ query: "warm up", limit: 1 }),
+  ]);
+  await Promise.race([work, new Promise((r) => setTimeout(r, Number(process.env.IRA_WARMUP_MS ?? 15_000)))]);
+  console.log(`[memory-api] warm-up took ${Date.now() - started}ms`);
+}
+await warmUp();
+
 // ─── Start ──────────────────────────────────────────────────────
 const server = Bun.serve({
   hostname: HOST,

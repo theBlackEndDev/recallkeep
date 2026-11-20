@@ -5,7 +5,8 @@
  * response, or a malformed JSON body all resolve to `null` (or `[]` for the
  * list/array-returning calls) — never a thrown exception. This follows
  * a core design rule: memory being down must never delay, block, or fail
- * a session. Every request carries `AbortSignal.timeout(800)`.
+ * a session. Every request carries `AbortSignal.timeout(800)`, except the explicit
+ * search calls (searchFacts, recallFacts, recallHistory, getMessage), which allow 5s.
  *
  * Endpoint contract: `./API.md`.
  *
@@ -19,6 +20,8 @@
 
 const BASE_URL = (process.env.IRA_URL ?? "http://127.0.0.1:7775").replace(/\/+$/, "");
 const TIMEOUT_MS = 800;
+/** Search calls are explicit tool calls: someone is waiting for the answer, and semantic recall embeds the query, so it takes about 0.5s warm. */
+const SEARCH_TIMEOUT_MS = 5000;
 
 export interface Fact {
 	id: string;
@@ -54,6 +57,7 @@ export interface HealthResult {
 async function request<T>(
 	path: string,
 	init: RequestInit,
+	timeoutMs: number = TIMEOUT_MS,
 ): Promise<T | null> {
 	try {
 		// Read per call so a token set after import (or in tests) is honoured.
@@ -61,7 +65,7 @@ async function request<T>(
 		const res = await fetch(`${BASE_URL}${path}`, {
 			...init,
 			headers: token ? { ...(init.headers as Record<string, string>), Authorization: `Bearer ${token}` } : init.headers,
-			signal: AbortSignal.timeout(TIMEOUT_MS),
+			signal: AbortSignal.timeout(timeoutMs),
 		});
 		if (!res.ok) return null;
 		return (await res.json()) as T;
@@ -174,7 +178,7 @@ export async function searchFacts(
 ): Promise<Fact[]> {
 	const scoped = project && project !== "all" ? `&project=${encodeURIComponent(project)}` : "";
 	const url = `/memory/search?q=${encodeURIComponent(query)}${scoped}&limit=${encodeURIComponent(String(limit))}`;
-	const result = await request<{ facts: Fact[] }>(url, { method: "GET" });
+	const result = await request<{ facts: Fact[] }>(url, { method: "GET" }, SEARCH_TIMEOUT_MS);
 	return result?.facts ?? [];
 }
 
@@ -198,7 +202,7 @@ export async function searchFacts(
  */
 export async function recallFacts(query: string, limit: number): Promise<Fact[]> {
 	const url = `/memory/recall?topic=${encodeURIComponent(query)}&limit=${encodeURIComponent(String(limit))}`;
-	const result = await request<{ facts: Fact[] }>(url, { method: "GET" });
+	const result = await request<{ facts: Fact[] }>(url, { method: "GET" }, SEARCH_TIMEOUT_MS);
 	return result?.facts ?? [];
 }
 
@@ -233,7 +237,7 @@ export async function recallHistory(
 ): Promise<RankedMessage[]> {
 	const scoped = project && project !== "all" ? `&project=${encodeURIComponent(project)}` : "";
 	const url = `/conversation/recall?q=${encodeURIComponent(query)}${scoped}&limit=${encodeURIComponent(String(limit))}`;
-	const result = await request<{ messages: RankedMessage[] }>(url, { method: "GET" });
+	const result = await request<{ messages: RankedMessage[] }>(url, { method: "GET" }, SEARCH_TIMEOUT_MS);
 	return result?.messages ?? [];
 }
 
@@ -243,7 +247,7 @@ export async function recallHistory(
  * Returns `null` on any failure (including a genuine 404).
  */
 export async function getMessage(id: string): Promise<Message | null> {
-	return request<Message>(`/conversation/message/${encodeURIComponent(id)}`, { method: "GET" });
+	return request<Message>(`/conversation/message/${encodeURIComponent(id)}`, { method: "GET" }, SEARCH_TIMEOUT_MS);
 }
 
 /**
