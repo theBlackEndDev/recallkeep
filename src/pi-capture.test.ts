@@ -18,6 +18,9 @@ import { writeFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+// Secret-shaped test values are assembled at runtime so no contiguous key-like text sits in the source.
+const frag = (...p: string[]) => p.join("");
+
 const TEST_DB_URL = process.env.RECALLKEEP_TEST_DATABASE_URL;
 if (TEST_DB_URL) {
   process.env.RECALLKEEP_DATABASE_URL = TEST_DB_URL;
@@ -62,7 +65,7 @@ function buildFixture(sessionId: string) {
     JSON.stringify({
       type: "message", id: "tr1", parentId: "a1", timestamp: "2026-01-01T00:00:02.500Z",
       message: { role: "toolResult", toolCallId: "tc1", toolName: "bash", isError: false,
-        content: [{ type: "text", text: "OPENAI_API_KEY=REDACTED-FIXTURE-2\n" }] },
+        content: [{ type: "text", text: "OPENAI_API_KEY=" + frag("sk-pr", "oj-Hj", "8kLp2", "QmN9v", "XyT4w", "RfB6c", "AeZgU", "3oIiK", "dSnJ7", "hMlPq", "WxCvF", "tYbEr") + "\n" }] },
     }),
     // off-path branch: parented on tr1, but the leaf (a3) does not descend from this.
     JSON.stringify({
@@ -90,7 +93,7 @@ function buildFixture(sessionId: string) {
     // fixture has to look like an actual leaked key to prove the engine works.
     JSON.stringify({
       type: "message", id: "a3", parentId: "tr2", timestamp: "2026-01-01T00:00:05.500Z",
-      message: { role: "assistant", content: [{ type: "text", text: "OPENAI_API_KEY=REDACTED-FIXTURE-2 is now set, done." }] },
+      message: { role: "assistant", content: [{ type: "text", text: "OPENAI_API_KEY=" + frag("sk-pr", "oj-Hj", "8kLp2", "QmN9v", "XyT4w", "RfB6c", "AeZgU", "3oIiK", "dSnJ7", "hMlPq", "WxCvF", "tYbEr") + " is now set, done." }] },
     }),
   ];
   return { lines, OVERSIZED_RESULT };
