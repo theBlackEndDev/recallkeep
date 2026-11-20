@@ -78,7 +78,7 @@ const TYPE_TO_CATEGORY: Record<string, MemoryCategory> = {
 // ─── Per-channel session cache (long-lived, one per channel) ───
 const sessionCache = new Map<string, string>();
 
-async function getOrCreateSession(channel: string): Promise<string> {
+async function getOrCreateSession(channel: string, cwd?: string): Promise<string> {
   const cached = sessionCache.get(channel);
   if (cached) return cached;
 
@@ -95,7 +95,12 @@ async function getOrCreateSession(channel: string): Promise<string> {
   const session = await openSession({
     channel,
     title: `${channel} conversation`,
-    metadata: { source: "memory-api-7775", persistent: true },
+    // cwd + project let /conversation/recall scope hook-logged turns to a project.
+    metadata: {
+      source: "memory-api-7775",
+      persistent: true,
+      ...(cwd ? { cwd, project: deriveProjectSlug(cwd) } : {}),
+    },
   });
   sessionCache.set(channel, session.id);
   return session.id;
@@ -221,7 +226,10 @@ async function route(req: Request): Promise<Response> {
         return err("role and content required");
       }
       const channel = body.channel ?? "unknown";
-      const sessionId = await getOrCreateSession(channel);
+      const sessionId = await getOrCreateSession(
+        channel,
+        typeof body.cwd === "string" ? body.cwd : undefined,
+      );
       const msg = await storeMessage({
         sessionId,
         role: body.role,

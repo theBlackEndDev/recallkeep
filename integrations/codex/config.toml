@@ -1,0 +1,12 @@
+# Add to ~/.codex/config.toml. Replace /PATH/TO/ira-memory.
+# Verified on Codex CLI 0.167.1. Hooks in a project's .codex/hooks.json did not
+# load in testing; inline [hooks] tables in config.toml do.
+
+[mcp_servers.ira-memory]
+command = "bun"
+args = ["/PATH/TO/ira-memory/src/cli.ts", "mcp"]
+
+[hooks]
+SessionStart = [{ hooks = [{ type = "command", command = "bun /PATH/TO/ira-memory/src/cli.ts hook codex session-start", timeout = 10 }] }]
+UserPromptSubmit = [{ hooks = [{ type = "command", command = "bun /PATH/TO/ira-memory/src/cli.ts hook codex prompt", timeout = 10 }] }]
+Stop = [{ hooks = [{ type = "command", command = "bun /PATH/TO/ira-memory/src/cli.ts hook codex stop", timeout = 10 }] }]

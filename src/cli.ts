@@ -76,6 +76,8 @@ async function main() {
     case "synthesize": return cmdSynthesize(subArgs);
     case "install-hooks": return cmdInstallHooks();
     case "capture":    return cmdCapture(subArgs);
+    case "mcp":        return (await import("./mcp.js")).runMcpServer();
+    case "hook":       return (await import("./hook.js")).runHook(subArgs);
     default:           printUsage();
   }
 }
@@ -115,6 +117,9 @@ Commands:
 
   install-hooks                                            Install Claude Code session capture hooks
   capture   --transcript PATH [--session-id ID]            Manually capture a CC transcript
+
+  mcp                                                      Run the MCP server over stdio (needs the HTTP API running)
+  hook      <claude|codex|agy> <session-start|prompt|stop> Lifecycle hook for a coding agent (reads event JSON on stdin)
 
 Categories: ${CATEGORIES.join(", ")}
 Tiers: ${TIERS.join(", ")}

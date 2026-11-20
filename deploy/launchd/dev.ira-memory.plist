@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  macOS: start ira-memory at login and restart it if it crashes.
+
+  1. Replace every /PATH/TO/ira-memory and /Users/YOU below.
+  2. cp deploy/launchd/dev.ira-memory.plist ~/Library/LaunchAgents/
+  3. launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/dev.ira-memory.plist
+  Logs: ~/Library/Logs/ira-memory.{out,err}.log
+  Stop: launchctl bootout gui/$(id -u)/dev.ira-memory
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>dev.ira-memory</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/PATH/TO/ira-memory/scripts/start.sh</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/PATH/TO/ira-memory</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <!-- launchd starts with a minimal PATH: include bun and docker. -->
+    <key>PATH</key>
+    <string>/Users/YOU/.bun/bin:/opt/homebrew/bin:/usr/local/bin:/Applications/Docker.app/Contents/Resources/bin:/usr/bin:/bin</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <dict>
+    <key>SuccessfulExit</key>
+    <false/>
+  </dict>
+  <key>StandardOutPath</key>
+  <string>/Users/YOU/Library/Logs/ira-memory.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/YOU/Library/Logs/ira-memory.err.log</string>
+</dict>
+</plist>

@@ -1,0 +1,13 @@
+{
+  "ira-memory": {
+    "SessionStart": [
+      { "type": "command", "command": "bun /PATH/TO/ira-memory/src/cli.ts hook agy session-start", "timeout": 10 }
+    ],
+    "PreInvocation": [
+      { "type": "command", "command": "bun /PATH/TO/ira-memory/src/cli.ts hook agy prompt", "timeout": 10 }
+    ],
+    "Stop": [
+      { "type": "command", "command": "bun /PATH/TO/ira-memory/src/cli.ts hook agy stop", "timeout": 10 }
+    ]
+  }
+}

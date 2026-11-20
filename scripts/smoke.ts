@@ -143,6 +143,55 @@ try {
   await cli("detect-sensitive");
   await cli("maintain");
   await cli("store", "--category", "FACT", "--content", `cli smoke ${slug}`);
+
+  // Agent integration: hooks and the MCP server, both through the HTTP API.
+  const agentEnv = { ...env, IRA_URL: base };
+  const cwd = `/home/dev/Projects/${slug}`;
+  await call("POST", "/memory", { content: `smoke decision ${slug}`, project: slug, tags: ["decision"] });
+  const hook = async (harness: string, event: string, payload: object) => {
+    const p = Bun.spawn(["bun", "run", "src/cli.ts", "hook", harness, event], {
+      cwd: root,
+      env: agentEnv,
+      stdin: new Blob([JSON.stringify(payload)]),
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const stdout = await new Response(p.stdout).text();
+    const code = await p.exited;
+    const hasDecision = stdout.includes(`smoke decision ${slug}`);
+    out.push(`hook ${harness} ${event} -> exit ${code} ${stdout.trim() ? JSON.stringify(shape(JSON.parse(stdout))) : "(no output)"} decision=${hasDecision}`);
+  };
+  for (const h of ["claude", "codex"]) {
+    await hook(h, "session-start", { session_id: `${h}-${slug}`, cwd, hook_event_name: "SessionStart" });
+    await hook(h, "prompt", { session_id: `${h}-${slug}`, cwd, prompt: `what did we decide about smoke ${slug}` });
+    await hook(h, "stop", { session_id: `${h}-${slug}`, cwd, last_assistant_message: `smoke reply ${slug}` });
+  }
+  await hook("agy", "session-start", { conversationId: `agy-${slug}`, cwd, workspacePaths: [cwd] });
+  await hook("agy", "prompt", { conversationId: `agy-${slug}`, cwd, lastUserInput: `what did we decide about smoke ${slug}`, invocationNum: 0 });
+  await hook("agy", "stop", { conversationId: `agy-${slug}`, cwd, transcriptPath: "/nonexistent" });
+  await hook("claude", "bogus", {});
+  await call("GET", `/conversation/recent?channel=claude:claude-${slug}&limit=5`);
+
+  const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
+  const { StdioClientTransport } = await import("@modelcontextprotocol/sdk/client/stdio.js");
+  const client = new Client({ name: "smoke", version: "0" });
+  await client.connect(
+    new StdioClientTransport({ command: "bun", args: ["run", "src/cli.ts", "mcp"], cwd: root, env: { ...agentEnv, IRA_CWD: cwd }, stderr: "pipe" }),
+  );
+  const tools = (await client.listTools()).tools.map((t) => t.name).sort();
+  out.push(`mcp tools -> ${tools.join(",")}`);
+  const mcpCall = async (name: string, args: Record<string, unknown>) => {
+    const r: any = await client.callTool({ name, arguments: args });
+    const t: string = r.content?.[0]?.text ?? "";
+    out.push(`mcp ${name} -> isError=${!!r.isError} ${t.split("\n")[0].replace(/c[a-z0-9]{20,}/g, "ID").replace(slug, "SLUG").slice(0, 60)}`);
+    return t;
+  };
+  const saved = await mcpCall("memory_save", { content: `mcp smoke fact ${slug}` });
+  await mcpCall("memory_list", { limit: 1 });
+  await mcpCall("memory_context", {});
+  await mcpCall("memory_search", { query: `mcp smoke fact ${slug}` });
+  await mcpCall("memory_forget", { id: saved.match(/id=(\S+)\]/)?.[1] ?? "missing" });
+  await client.close();
 } finally {
   server.kill();
   await server.exited;
