@@ -85,7 +85,7 @@ test("engine tag reflects heuristic's contribution", async () => {
 // --- accepted cost of the correction: the plan-doc FP returns ---
 // Documented, not silently regressed: D8's own asymmetry ( over-redaction
 // recoverable, under-redaction not) is why this is the right trade to make.
-const planPath = "/home/dev/Projects/Plans/pi-ira-memory-capture.md";
+const planPath = "/home/dev/Projects/Plans/pi-recallkeep-capture.md";
 let planText: string | null = null;
 try {
   planText = readFileSync(planPath, "utf-8");
@@ -140,7 +140,7 @@ test("empty batch returns empty", async () => {
 // from process.env.PATH mutated at runtime — verified directly. A bogus
 // binary name exercises the same ENOENT path deterministically.)
 test("runScanner returns null (not a throw) for a nonexistent binary", async () => {
-  const missing = await runScanner("this-binary-does-not-exist-ira-memory-test", [], "anything");
+  const missing = await runScanner("this-binary-does-not-exist-recallkeep-test", [], "anything");
   expect(missing).toBeNull();
 });
 

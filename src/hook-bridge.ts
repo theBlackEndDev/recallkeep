@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * hook-bridge.ts - Bridge between IRA hooks and the memory database.
+ * hook-bridge.ts - Bridge between agent hooks and the memory database.
  *
  * Called by hook scripts via: bun run <this-file> <command> [args...]
  *
@@ -136,21 +136,21 @@ async function main() {
         const contextParts: string[] = [];
 
         if (longTerm.facts.length > 0) {
-          contextParts.push("[IRA DB MEMORY — Long-term]");
+          contextParts.push("[RecallKeep — Long-term]");
           for (const f of longTerm.facts) {
             contextParts.push(`- [${f.category}] ${f.content}`);
           }
         }
 
         if (results.facts.length > 0) {
-          contextParts.push("\n[IRA DB MEMORY — Recent (24h)]");
+          contextParts.push("\n[RecallKeep — Recent (24h)]");
           for (const f of results.facts) {
             contextParts.push(`- [${f.category}] ${f.content}`);
           }
         }
 
         if (results.summaries.length > 0) {
-          contextParts.push("\n[IRA DB MEMORY — Recent Summaries]");
+          contextParts.push("\n[RecallKeep — Recent Summaries]");
           for (const s of results.summaries) {
             contextParts.push(`- [${s.scope}] ${s.content.slice(0, 200)}`);
           }
@@ -191,7 +191,7 @@ async function main() {
           (f) => (f as any).learningType != null
         );
         if (learningFacts.length > 0) {
-          const parts = ["\n[IRA DB MEMORY — Learnings]"];
+          const parts = ["\n[RecallKeep — Learnings]"];
           for (const f of learningFacts) {
             parts.push(`- [${(f as any).learningType}] ${f.content}`);
           }

@@ -5,7 +5,7 @@
  * Derive a project slug from a session's cwd. This is the one shared
  * algorithm — the pi extension's `slug.ts` (projectSlugForCwd) must implement
  * the same three rules in the same order; a parity test in both repos checks
- * they agree (plan: pi-ira-memory-capture.md D2).
+ * they agree (plan: pi-recallkeep-capture.md D2).
  *
  * Recognized (immediate child of a projects dir, returned verbatim):
  *   /srv/projects/<slug>/...   (server layout)

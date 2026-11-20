@@ -4,7 +4,7 @@
 // endpoint plus the exit code of each CLI command. Compare two runs with diff
 // to catch regressions.
 //
-//   SMOKE_DATABASE_URL=postgresql://.../ira_memory_test bun scripts/smoke.ts > before.txt
+//   SMOKE_DATABASE_URL=postgresql://.../recallkeep_test bun scripts/smoke.ts > before.txt
 //
 // The database must already be migrated (bunx prisma migrate deploy). It is
 // written to, so never point it at a database you care about.
@@ -18,26 +18,26 @@ if (!dbUrl) {
   console.error("SMOKE_DATABASE_URL is required (a throwaway, migrated database)");
   process.exit(2);
 }
-if (/\/ira_memory(\?|$)/.test(dbUrl)) {
-  console.error("refusing to run against the main ira_memory database");
+if (/\/recallkeep(\?|$)/.test(dbUrl)) {
+  console.error("refusing to run against the main recallkeep database");
   process.exit(2);
 }
 
 const root = resolve(import.meta.dir, "..");
-const home = mkdtempSync(join(tmpdir(), "ira-smoke-"));
+const home = mkdtempSync(join(tmpdir(), "recallkeep-smoke-"));
 const port = Number(process.env.SMOKE_PORT ?? 7799);
 const base = `http://127.0.0.1:${port}`;
 const env: Record<string, string> = {
   ...(process.env as Record<string, string>),
   HOME: home,
-  MEMORY_DATABASE_URL: dbUrl,
-  MEMORY_API_PORT: String(port),
-  MEMORY_API_HOST: "127.0.0.1",
-  IRA_LLM_PROVIDER: "none",
-  IRA_AUTO_LEARN: "false",
+  RECALLKEEP_DATABASE_URL: dbUrl,
+  RECALLKEEP_API_PORT: String(port),
+  RECALLKEEP_API_HOST: "127.0.0.1",
+  RECALLKEEP_LLM_PROVIDER: "none",
+  RECALLKEEP_AUTO_LEARN: "false",
 };
 const token = process.env.SMOKE_API_TOKEN;
-if (token) env.IRA_API_TOKEN = token;
+if (token) env.RECALLKEEP_API_TOKEN = token;
 
 function shape(v: unknown): unknown {
   if (Array.isArray(v)) return v.length ? [shape(v[0])] : [];
@@ -145,7 +145,7 @@ try {
   await cli("store", "--category", "FACT", "--content", `cli smoke ${slug}`);
 
   // Agent integration: hooks and the MCP server, both through the HTTP API.
-  const agentEnv = { ...env, IRA_URL: base };
+  const agentEnv = { ...env, RECALLKEEP_URL: base };
   const cwd = `/home/dev/Projects/${slug}`;
   await call("POST", "/memory", { content: `smoke decision ${slug}`, project: slug, tags: ["decision"] });
   const hook = async (harness: string, event: string, payload: object) => {
@@ -176,7 +176,7 @@ try {
   const { StdioClientTransport } = await import("@modelcontextprotocol/sdk/client/stdio.js");
   const client = new Client({ name: "smoke", version: "0" });
   await client.connect(
-    new StdioClientTransport({ command: "bun", args: ["run", "src/cli.ts", "mcp"], cwd: root, env: { ...agentEnv, IRA_CWD: cwd }, stderr: "pipe" }),
+    new StdioClientTransport({ command: "bun", args: ["run", "src/cli.ts", "mcp"], cwd: root, env: { ...agentEnv, RECALLKEEP_CWD: cwd }, stderr: "pipe" }),
   );
   const tools = (await client.listTools()).tools.map((t) => t.name).sort();
   out.push(`mcp tools -> ${tools.join(",")}`);

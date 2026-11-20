@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Start everything ira-memory needs, then run the HTTP API in the foreground.
+# Start everything recallkeep needs, then run the HTTP API in the foreground.
 # Used by the launchd and systemd templates in deploy/, and fine to run by hand.
 #
 #   1. wait for Docker
@@ -10,7 +10,7 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
-BUN="${IRA_BUN_PATH:-$(command -v bun || echo "$HOME/.bun/bin/bun")}"
+BUN="${RECALLKEEP_BUN_PATH:-$(command -v bun || echo "$HOME/.bun/bin/bun")}"
 
 until docker info >/dev/null 2>&1; do
   echo "[start] waiting for Docker..." >&2
@@ -19,7 +19,7 @@ done
 
 docker compose up -d
 
-until docker compose exec -T ira-memory-db pg_isready -U ira_memory -d ira_memory >/dev/null 2>&1; do
+until docker compose exec -T db pg_isready -U recallkeep -d recallkeep >/dev/null 2>&1; do
   sleep 2
 done
 

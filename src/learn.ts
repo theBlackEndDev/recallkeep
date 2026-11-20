@@ -4,7 +4,7 @@ import { semanticSearch } from "./search.js";
 import { getClient, CHAT_MODEL } from "./llm.js";
 import type { LearnInput, LearnResult, LearningType, MemoryCategory } from "./types.js";
 
-const openai = getClient(); // null when IRA_LLM_PROVIDER=none → learning extraction is skipped
+const openai = getClient(); // null when RECALLKEEP_LLM_PROVIDER=none → learning extraction is skipped
 
 const VALID_LEARNING_TYPES = new Set<string>([
   "MISTAKE", "BEST_PRACTICE", "INSTITUTIONAL", "WORKFLOW_PREF", "CODEBASE_RULE",

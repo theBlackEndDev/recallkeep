@@ -1,9 +1,9 @@
 /**
- * Session memory extension: connects pi to ira-memory.
+ * Session memory extension: connects pi to recallkeep.
  *
  * Why capture works the way it does: the original design journaled a one-line, 500-char
  * digest of each turn — user request truncated to 120 chars, tool names,
- * file paths — and sent THAT to ira-memory as the sole record, mislabeled
+ * file paths — and sent THAT to recallkeep as the sole record, mislabeled
  * `role: "assistant"` even though it was mostly the user's own text. The
  * model's actual answer was never stored. In one real case that lost an
  * afternoon of design decisions: the reasoning existed only in the session
@@ -30,9 +30,9 @@
  *   agent_settled       → (a) build the LOCAL turn digest used only for the
  *                         eventual handoff (journal.ts — this never leaves
  *                         the process), and (b) debounce-schedule a sync of
- *                         pi's own session FILE to ira-memory. No message
+ *                         pi's own session FILE to recallkeep. No message
  *                         content crosses the network from this file at all;
- *                         `POST /session/sync` carries a path, and ira-memory
+ *                         `POST /session/sync` carries a path, and recallkeep
  *                         reads the transcript itself. That is what makes the
  *                         truncation failure mode structurally impossible to
  *                         reintroduce here — there is no string in this file
@@ -314,7 +314,7 @@ export default function memory(pi: ExtensionAPI) {
 		}
 	}
 
-	/** Sync pi's session file to ira-memory. Updates the circuit breaker; never throws. */
+	/** Sync pi's session file to recallkeep. Updates the circuit breaker; never throws. */
 	async function doSync(ctx: ExtensionContext, final: boolean): Promise<void> {
 		if (!captureEnabled || syncFailures >= MAX_SYNC_FAILURES) return;
 		const sessionFile = ctx.sessionManager.getSessionFile();
@@ -417,7 +417,7 @@ export default function memory(pi: ExtensionAPI) {
 			if (!projectTag) return;
 			const entries = ctx.sessionManager.getEntries() as SessionEntry[];
 
-			// Local only — never sent to ira-memory. Feeds handoff.ts's "Worked
+			// Local only — never sent to recallkeep. Feeds handoff.ts's "Worked
 			// on" / "Touched" sections at session_shutdown. See journal.ts's
 			// docstring for why this file no longer carries the actual turn.
 			const line = digestTurn(entries);
@@ -477,7 +477,7 @@ export default function memory(pi: ExtensionAPI) {
 				lines.push(`service       error checking health: ${(error as Error).message}`);
 			}
 
-			lines.push(`journal lines ${journalLines.length} (local — used for the handoff, not sent to ira-memory)`);
+			lines.push(`journal lines ${journalLines.length} (local — used for the handoff, not sent to RecallKeep)`);
 
 			if (!tag) {
 				ctx.ui.notify(lines.join("\n"), "info");
@@ -510,7 +510,7 @@ export default function memory(pi: ExtensionAPI) {
 		name: "memory_search",
 		label: "Memory search",
 		description: [
-			"Search ira-memory: both curated facts (memory_facts) and full prior session history",
+			"Search RecallKeep: both curated facts (memory_facts) and full prior session history",
 			"(conversation text, both user and assistant turns, and tool activity).",
 			"Use this when you need to know what was already decided, tried, or discussed in an earlier",
 			"session before asking the user to repeat it or re-deciding it yourself.",
@@ -619,7 +619,7 @@ export default function memory(pi: ExtensionAPI) {
 		name: "memory_save",
 		label: "Memory save",
 		description: [
-			"Save a curated fact to ira-memory, the user's source of truth across every project and session.",
+			"Save a curated fact to RecallKeep, the user's source of truth across every project and session.",
 			"Save anything a later session must know: decisions, the user's rules and preferences, findings,",
 			"what was verified and how, status, open questions. Files in the repo are not enough on their own.",
 			"One idea per fact, self-contained, dated, with the why. Defaults to the current project.",
@@ -628,7 +628,7 @@ export default function memory(pi: ExtensionAPI) {
 			"injected at the start of this project's sessions.",
 		].join(" "),
 		promptSnippet:
-			'memory_save(content, type?, project?, tags?) — save a curated fact to ira-memory; project:"global" for rules that apply everywhere; tag "decision" for locked decisions',
+			'memory_save(content, type?, project?, tags?) — save a curated fact to RecallKeep; project:"global" for rules that apply everywhere; tag "decision" for locked decisions',
 		parameters: Type.Object({
 			content: Type.String({ description: "The fact, self-contained: what, why, date, and how it was verified." }),
 			type: Type.Optional(
@@ -655,7 +655,7 @@ export default function memory(pi: ExtensionAPI) {
 			});
 			if (!fact) {
 				return {
-					content: [{ type: "text", text: "ira-memory did not accept the fact (service down at 127.0.0.1:7775, or a non-2xx). Nothing was saved." }],
+					content: [{ type: "text", text: "RecallKeep did not accept the fact (service down at 127.0.0.1:7775, or a non-2xx). Nothing was saved." }],
 				};
 			}
 			return { content: [{ type: "text", text: `Saved [fact id=${fact.id}] ${fact.tags.join(",")}\n${fact.content}` }] };

@@ -8,7 +8,7 @@
 # server-side push protection is what actually caught it; a gitleaks-only
 # local hook would have let it through. Layer 2 below is a narrow,
 # low-false-positive regex net for exactly that class of gap — deliberately
-# NOT the broad kv_assignment/base64 patterns from ira-memory's redact.ts,
+# NOT the broad kv_assignment/base64 patterns from recallkeep's redact.ts,
 # since a false positive here blocks a push outright rather than just adding
 # a placeholder to a memory row.
 #
@@ -18,7 +18,7 @@
 #
 # Known false positive? git push --no-verify
 #
-# Source of truth: ira-memory/scripts/pre-push-hook.sh (install-pre-push-hook.sh)
+# Source of truth: recallkeep/scripts/pre-push-hook.sh (install-pre-push-hook.sh)
 
 zero="0000000000000000000000000000000000000000"
 blocked=0

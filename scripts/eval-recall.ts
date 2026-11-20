@@ -6,7 +6,7 @@
  * vector, and reports precision@1/@3 and MRR so the committed defaults are a measured choice.
  *
  * Safety: every seeded fact is named `__eval_*` and deleted in a finally block. Point it at a
- * throwaway instance (MEMORY_API_PORT=7776), never the live service, so a crash mid-run cannot
+ * throwaway instance (RECALLKEEP_API_PORT=7776), never the live service, so a crash mid-run cannot
  * leave synthetic rows in the real store.
  *
  *   bun run scripts/eval-recall.ts [--base http://127.0.0.1:7776] [--seed-only|--clean-only]
@@ -91,11 +91,11 @@ const PROBES: Probe[] = [
 ];
 
 const WEIGHT_GRID = [
-  { name: "committed-pre-fix", IRA_W_RECENCY: 0.3, IRA_W_RELEVANCE: 0.4, IRA_W_TIER: 0.2, IRA_W_CONFIDENCE: 0.1 },
-  { name: "relevance-lean", IRA_W_RECENCY: 0.2, IRA_W_RELEVANCE: 0.55, IRA_W_TIER: 0.15, IRA_W_CONFIDENCE: 0.1 },
-  { name: "relevance-strong", IRA_W_RECENCY: 0.15, IRA_W_RELEVANCE: 0.6, IRA_W_TIER: 0.15, IRA_W_CONFIDENCE: 0.1 },
-  { name: "relevance-dominant", IRA_W_RECENCY: 0.05, IRA_W_RELEVANCE: 0.8, IRA_W_TIER: 0.1, IRA_W_CONFIDENCE: 0.05 },
-  { name: "relevance-only", IRA_W_RECENCY: 0.0, IRA_W_RELEVANCE: 1.0, IRA_W_TIER: 0.0, IRA_W_CONFIDENCE: 0.0 },
+  { name: "committed-pre-fix", RECALLKEEP_W_RECENCY: 0.3, RECALLKEEP_W_RELEVANCE: 0.4, RECALLKEEP_W_TIER: 0.2, RECALLKEEP_W_CONFIDENCE: 0.1 },
+  { name: "relevance-lean", RECALLKEEP_W_RECENCY: 0.2, RECALLKEEP_W_RELEVANCE: 0.55, RECALLKEEP_W_TIER: 0.15, RECALLKEEP_W_CONFIDENCE: 0.1 },
+  { name: "relevance-strong", RECALLKEEP_W_RECENCY: 0.15, RECALLKEEP_W_RELEVANCE: 0.6, RECALLKEEP_W_TIER: 0.15, RECALLKEEP_W_CONFIDENCE: 0.1 },
+  { name: "relevance-dominant", RECALLKEEP_W_RECENCY: 0.05, RECALLKEEP_W_RELEVANCE: 0.8, RECALLKEEP_W_TIER: 0.1, RECALLKEEP_W_CONFIDENCE: 0.05 },
+  { name: "relevance-only", RECALLKEEP_W_RECENCY: 0.0, RECALLKEEP_W_RELEVANCE: 1.0, RECALLKEEP_W_TIER: 0.0, RECALLKEEP_W_CONFIDENCE: 0.0 },
 ];
 
 async function api(path: string, init?: RequestInit) {

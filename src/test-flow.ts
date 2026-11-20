@@ -13,7 +13,7 @@ import {
 } from "./index.js";
 
 async function test() {
-  console.log("=== IRA Memory Integration Test ===\n");
+  console.log("=== RecallKeep Integration Test ===\n");
 
   // 1. Open a session
   const session = await openSession({

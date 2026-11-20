@@ -37,7 +37,7 @@ const fact = (content: string, tags: string[], created_at: string) => ({ id: con
 
 test("session-start blocks: rules oldest first, decisions newest first, recent facts skip decisions and digests", () => {
   expect(formatRules([fact("[global] b", [], "2026-02"), fact("a", [], "2026-01")])).toBe(
-    "## Standing rules (ira-memory, every project)\n- a\n- b\n",
+    "## Standing rules (RecallKeep, every project)\n- a\n- b\n",
   );
   expect(formatDecisions([fact("old", ["decision"], "2026-01"), fact("new", ["decision"], "2026-02"), fact("x", [], "2026-03")])).toBe(
     "## Locked decisions for this project\n- new\n- old\n",

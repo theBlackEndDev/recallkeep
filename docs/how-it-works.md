@@ -2,7 +2,7 @@
 
 This file explains the architecture, data flow, ranking, project scoping, decisions, learning, and tiers.
 
-This file explains how ira-memory is built: the storage layers, the data flow, how recall ranks results, how projects are scoped, the decisions layer, and how facts move between tiers.
+This file explains how RecallKeep is built: the storage layers, the data flow, how recall ranks results, how projects are scoped, the decisions layer, and how facts move between tiers.
 
 ## Architecture
 
@@ -76,9 +76,9 @@ score = W_RELEVANCE * relevance
       + boost
 ```
 
-The defaults are `W_RELEVANCE = 0.6`, `W_RECENCY = 0.15`, `W_TIER = 0.15`, and `W_CONFIDENCE = 0.1`. Override them with the `IRA_W_*` variables in [configuration.md](configuration.md#recall-tuning).
+The defaults are `W_RELEVANCE = 0.6`, `W_RECENCY = 0.15`, `W_TIER = 0.15`, and `W_CONFIDENCE = 0.1`. Override them with the `RECALLKEEP_W_*` variables in [configuration.md](configuration.md#recall-tuning).
 
-- **relevance** is the better of two signals. The full-text signal is capped at `IRA_FTS_CEILING` (default `0.55`), because a keyword rank only means something relative to its own result set. The semantic signal is cosine similarity, which is absolute. A fact that does not match at all scores `0`, so relevance leads whenever anything matches.
+- **relevance** is the better of two signals. The full-text signal is capped at `RECALLKEEP_FTS_CEILING` (default `0.55`), because a keyword rank only means something relative to its own result set. The semantic signal is cosine similarity, which is absolute. A fact that does not match at all scores `0`, so relevance leads whenever anything matches.
 - **recency** is `1 / (1 + 0.1 * days_old)`.
 - **tier_weight** is `1.0` for `LONG_TERM`, `0.6` for `DAILY`, and `0.3` for `SHORT_TERM`.
 - **confidence** is the fact's stored confidence, from `0` to `1`.
@@ -144,7 +144,7 @@ Session close can also run `learn()`, which records a rating and extracts lesson
 
 - `discover()` mines repeated patterns across sessions and writes them as `PREFERENCE` or `LESSON` facts.
 - `synthesize()` rolls related facts into one consolidated answer, and can save it.
-- Automatic learning on `store` can be turned off with `IRA_AUTO_LEARN=false`.
+- Automatic learning on `store` can be turned off with `RECALLKEEP_AUTO_LEARN=false`.
 
 ## Tiers
 

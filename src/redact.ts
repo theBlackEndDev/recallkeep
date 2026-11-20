@@ -1,5 +1,5 @@
 // Redaction — Phase 2 engine chain (betterleaks -> gitleaks -> heuristic).
-// See specs/../Plans/pi-ira-memory-capture.md D4/D8.
+// See specs/../Plans/pi-recallkeep-capture.md D4/D8.
 //
 // Applied before storeMessage AND before embedding, never after. Once a row
 // is written it is in the WAL and in every backup taken since; redacting
@@ -47,7 +47,7 @@
 const PLACEHOLDER = "[REDACTED]";
 /** Separator between messages in a batch scan. A null byte + rare token, so
  * it can never collide with real content and a finding can never span it. */
-const BATCH_SEPARATOR = "\n\n\x00IRA_MSG_SEP\x00\n\n";
+const BATCH_SEPARATOR = "\n\n\x00RECALLKEEP_MSG_SEP\x00\n\n";
 const SCAN_TIMEOUT_MS = 10_000;
 
 export type RedactionEngine = "betterleaks" | "gitleaks" | "heuristic" | "betterleaks+heuristic" | "gitleaks+heuristic";

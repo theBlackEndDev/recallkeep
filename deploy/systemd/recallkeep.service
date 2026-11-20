@@ -1,0 +1,24 @@
+# Linux: run recallkeep as a systemd user service.
+#
+#   1. Replace /PATH/TO/recallkeep below.
+#   2. mkdir -p ~/.config/systemd/user && cp deploy/systemd/recallkeep.service ~/.config/systemd/user/
+#   3. systemctl --user daemon-reload && systemctl --user enable --now recallkeep
+#   4. Optional, to start at boot without logging in: sudo loginctl enable-linger $USER
+# Logs: journalctl --user -u recallkeep -f
+# Your user must be able to run docker (member of the docker group).
+
+[Unit]
+Description=recallkeep API server
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/PATH/TO/recallkeep
+Environment=PATH=%h/.bun/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/bin/bash /PATH/TO/recallkeep/scripts/start.sh
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

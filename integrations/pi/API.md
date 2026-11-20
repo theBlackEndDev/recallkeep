@@ -1,6 +1,6 @@
-# ira-memory HTTP API (used by memory extension)
+# RecallKeep HTTP API (used by memory extension)
 
-Base URL: `http://127.0.0.1:7775` (overridable via `MEMORY_API_PORT` / `MEMORY_API_HOST` env vars on the server; http-server.ts).
+Base URL: `http://127.0.0.1:7775` (overridable via `RECALLKEEP_API_PORT` / `RECALLKEEP_API_HOST` env vars on the server; http-server.ts).
 
 Source: `../../src/http-server.ts`. All responses are JSON with permissive CORS headers (http-server.ts). Errors are `{"error": "<msg>"}` with status 400 (validation), 404 (unknown route), or 500 (exception) (http-server.ts, 254).
 
@@ -77,7 +77,7 @@ Body fields:
 | `sessionFile` | string | **Yes** | Must resolve under `~/.pi/agent/sessions/` — 403 otherwise. This is a trust boundary: the server reads whatever path it's given. |
 | `sessionId` | string | No | Hint only; the file's own `{"type":"session", id}` header is authoritative when present. |
 | `cwd` | string | No | Hint only; the file's own header `cwd` is authoritative when present. Used for project-slug resolution. |
-| `final` | boolean | No | `true` on `session_shutdown`: marks the imported ira-memory session `endedAt`. Default `false`. |
+| `final` | boolean | No | `true` on `session_shutdown`: marks the imported RecallKeep session `endedAt`. Default `false`. |
 
 ### Response `202`
 ```json

@@ -13,16 +13,16 @@ BASE="http://127.0.0.1:$PORT"
 
 run_one() {
   local name="$1" rec="$2" rel="$3" tier="$4" conf="$5"
-  MEMORY_API_PORT=$PORT \
-  IRA_W_RECENCY="$rec" IRA_W_RELEVANCE="$rel" IRA_W_TIER="$tier" IRA_W_CONFIDENCE="$conf" \
-    bun run src/http-server.ts >/tmp/ira-eval.log 2>&1 &
+  RECALLKEEP_API_PORT=$PORT \
+  RECALLKEEP_W_RECENCY="$rec" RECALLKEEP_W_RELEVANCE="$rel" RECALLKEEP_W_TIER="$tier" RECALLKEEP_W_CONFIDENCE="$conf" \
+    bun run src/http-server.ts >/tmp/recallkeep-eval.log 2>&1 &
   local pid=$!
   for _ in $(seq 1 25); do
     curl -s -m 1 "$BASE/health" >/dev/null 2>&1 && break
     sleep 0.4
   done
   if ! curl -s -m 2 "$BASE/health" >/dev/null 2>&1; then
-    echo "  $name: FAILED TO START (see /tmp/ira-eval.log)"; kill $pid 2>/dev/null; return
+    echo "  $name: FAILED TO START (see /tmp/recallkeep-eval.log)"; kill $pid 2>/dev/null; return
   fi
   printf '  %-20s ' "$name"
   bun run scripts/eval-recall.ts --base "$BASE" 2>/dev/null | grep -E '^P@1' | sed 's/^/ /'

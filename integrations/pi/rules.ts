@@ -35,5 +35,5 @@ export function formatStandingRules(facts: Fact[], budget = RULES_CHAR_BUDGET): 
 		used += line.length + 1;
 	}
 	if (lines.length === 0) return "";
-	return `## Standing rules (ira-memory, every project)\n${lines.join("\n")}\n`;
+	return `## Standing rules (RecallKeep, every project)\n${lines.join("\n")}\n`;
 }

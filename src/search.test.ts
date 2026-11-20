@@ -1,22 +1,22 @@
 // Regression tests for BUG A (hyphenated & identifier-like tokens in FTS search).
 // Pure unit tests for parseSearchQuery / escapeIlike run unconditionally;
-// DB-backed tests against Postgres FTS + pg_trgm run when IRA_TEST_DATABASE_URL is set.
+// DB-backed tests against Postgres FTS + pg_trgm run when RECALLKEEP_TEST_DATABASE_URL is set.
 
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 
-const TEST_DB_URL = process.env.IRA_TEST_DATABASE_URL;
+const TEST_DB_URL = process.env.RECALLKEEP_TEST_DATABASE_URL;
 if (TEST_DB_URL) {
-  process.env.MEMORY_DATABASE_URL = TEST_DB_URL;
-  process.env.IRA_LLM_PROVIDER = "none";
+  process.env.RECALLKEEP_DATABASE_URL = TEST_DB_URL;
+  process.env.RECALLKEEP_LLM_PROVIDER = "none";
 } else {
-  delete process.env.MEMORY_DATABASE_URL;
+  delete process.env.RECALLKEEP_DATABASE_URL;
 }
 
 const { parseSearchQuery, escapeIlike } = await import("./recall.js");
 
 describe("parseSearchQuery & escapeIlike (pure helpers)", () => {
   test("preserves hyphenated, underscored, and dotted identifier tokens", () => {
-    for (const tok of ["MCP-LIVE-OK", "ira-live", "pg_trgm", "v0.1.0", "snake_case_name"]) {
+    for (const tok of ["MCP-LIVE-OK", "keep-live", "pg_trgm", "v0.1.0", "snake_case_name"]) {
       const parsed = parseSearchQuery(tok);
       expect(parsed.tokens).toEqual([tok]);
       expect(parsed.identifierTokens).toEqual([tok]);
@@ -26,11 +26,11 @@ describe("parseSearchQuery & escapeIlike (pure helpers)", () => {
   });
 
   test("strips surrounding brackets and punctuation without collapsing internal delimiters", () => {
-    const parsed = parseSearchQuery("[ira-live] MCP-LIVE-OK codex");
-    expect(parsed.tokens).toEqual(["ira-live", "MCP-LIVE-OK", "codex"]);
-    expect(parsed.identifierTokens).toEqual(["ira-live", "MCP-LIVE-OK"]);
-    expect(parsed.webAndQuery).toBe("ira-live MCP-LIVE-OK codex");
-    expect(parsed.webOrQuery).toBe("ira-live OR MCP-LIVE-OK OR codex");
+    const parsed = parseSearchQuery("[keep-live] MCP-LIVE-OK codex");
+    expect(parsed.tokens).toEqual(["keep-live", "MCP-LIVE-OK", "codex"]);
+    expect(parsed.identifierTokens).toEqual(["keep-live", "MCP-LIVE-OK"]);
+    expect(parsed.webAndQuery).toBe("keep-live MCP-LIVE-OK codex");
+    expect(parsed.webOrQuery).toBe("keep-live OR MCP-LIVE-OK OR codex");
   });
 
   test("ordinary word queries produce no identifier fallback tokens", () => {
@@ -46,7 +46,7 @@ describe("parseSearchQuery & escapeIlike (pure helpers)", () => {
   });
 });
 
-describe.skipIf(!TEST_DB_URL)("textSearch & recall hyphenated/identifier tokens (needs IRA_TEST_DATABASE_URL)", () => {
+describe.skipIf(!TEST_DB_URL)("textSearch & recall hyphenated/identifier tokens (needs RECALLKEEP_TEST_DATABASE_URL)", () => {
   let textSearch: typeof import("./recall.js").textSearch;
   let recall: typeof import("./recall.js").recall;
   let recallMessages: typeof import("./recall.js").recallMessages;
@@ -55,7 +55,7 @@ describe.skipIf(!TEST_DB_URL)("textSearch & recall hyphenated/identifier tokens 
   let factIds: string[] = [];
 
   const FIXTURE_CONTENT =
-    "[ira-live] MCP-LIVE-OK codex verified with pg_trgm on release v0.1.0 using snake_case_name";
+    "[keep-live] MCP-LIVE-OK codex verified with pg_trgm on release v0.1.0 using snake_case_name";
 
   beforeAll(async () => {
     ({ textSearch, recall, recallMessages } = await import("./recall.js"));
@@ -66,7 +66,7 @@ describe.skipIf(!TEST_DB_URL)("textSearch & recall hyphenated/identifier tokens 
         category: "FACT",
         tier: "LONG_TERM",
         content: FIXTURE_CONTENT,
-        tags: ["project:ira-live-test"],
+        tags: ["project:keep-live-test"],
       },
     });
     factIds.push(fact.id);
@@ -75,7 +75,7 @@ describe.skipIf(!TEST_DB_URL)("textSearch & recall hyphenated/identifier tokens 
       data: {
         channel: "pi",
         title: "search.test fixture",
-        metadata: { project: "ira-live-test" },
+        metadata: { project: "keep-live-test" },
       },
     });
     sessionId = session.id;
@@ -99,7 +99,7 @@ describe.skipIf(!TEST_DB_URL)("textSearch & recall hyphenated/identifier tokens 
     await prisma.$disconnect();
   });
 
-  for (const token of ["MCP-LIVE-OK", "ira-live", "pg_trgm", "v0.1.0", "snake_case_name"]) {
+  for (const token of ["MCP-LIVE-OK", "keep-live", "pg_trgm", "v0.1.0", "snake_case_name"]) {
     test(`textSearch finds fact and message for identifier token "${token}"`, async () => {
       const res = await textSearch({ query: token, tables: ["facts", "messages"], limit: 20 });
       expect(res.facts.some((f) => f.id === factIds[0])).toBe(true);
@@ -107,10 +107,10 @@ describe.skipIf(!TEST_DB_URL)("textSearch & recall hyphenated/identifier tokens 
     });
 
     test(`recall and recallMessages find fact and message for identifier token "${token}"`, async () => {
-      const factRes = await recall({ query: token, tags: ["project:ira-live-test"], limit: 10 });
+      const factRes = await recall({ query: token, tags: ["project:keep-live-test"], limit: 10 });
       expect(factRes.facts.some((f) => f.id === factIds[0])).toBe(true);
 
-      const msgRes = await recallMessages({ query: token, project: "ira-live-test", limit: 10 });
+      const msgRes = await recallMessages({ query: token, project: "keep-live-test", limit: 10 });
       expect(msgRes.messages.some((m) => m.sessionId === sessionId)).toBe(true);
     });
   }

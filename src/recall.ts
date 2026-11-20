@@ -38,8 +38,8 @@ export function escapeIlike(token: string): string {
  * identifier tokens (hyphenated, underscored, dotted) for an `ILIKE` trigram fallback.
  *
  * Why: stripping `[^\w]` before `to_tsquery` collapsed `MCP-LIVE-OK` into `MCPLIVEOK`,
- * `ira-live` into `iralive`, and `v0.1.0` into `v010`, none of which exist in the stored
- * `to_tsvector('english', content)` column (`'mcp-live-ok'`, `'ira-l'`, `'v0.1.0'`).
+ * `keep-live` into `keeplive`, and `v0.1.0` into `v010`, none of which exist in the stored
+ * `to_tsvector('english', content)` column (`'mcp-live-ok'`, `'v0.1.0'`).
  */
 export function parseSearchQuery(rawQuery: string): ParsedSearchQuery {
   const tokens = rawQuery
@@ -58,14 +58,14 @@ export function parseSearchQuery(rawQuery: string): ParsedSearchQuery {
 
 /**
  * Ranking weights. Env-overridable so they can be swept by an eval harness against a second
- * instance (MEMORY_API_PORT) without editing source or bouncing the live service. The committed
+ * instance (RECALLKEEP_API_PORT) without editing source or bouncing the live service. The committed
  * defaults are the winners of that sweep — see scripts/eval-recall.ts.
  */
 const W = {
-  recency: Number(process.env.IRA_W_RECENCY ?? 0.15),
-  relevance: Number(process.env.IRA_W_RELEVANCE ?? 0.6),
-  tier: Number(process.env.IRA_W_TIER ?? 0.15),
-  confidence: Number(process.env.IRA_W_CONFIDENCE ?? 0.1),
+  recency: Number(process.env.RECALLKEEP_W_RECENCY ?? 0.15),
+  relevance: Number(process.env.RECALLKEEP_W_RELEVANCE ?? 0.6),
+  tier: Number(process.env.RECALLKEEP_W_TIER ?? 0.15),
+  confidence: Number(process.env.RECALLKEEP_W_CONFIDENCE ?? 0.1),
 };
 
 // ─── Recall: structured + FTS combined ──────────────────────────
@@ -194,8 +194,8 @@ export async function recall(input: RecallInput): Promise<RecallResult> {
   //
   // It was previously gated on `facts.length < limit`, which the structured pass above guaranteed
   // was never true — so the vector index sat unused since the store was built. Set
-  // IRA_SEMANTIC_RECALL=0 to fall back to full-text only.
-  if (input.query && process.env.IRA_SEMANTIC_RECALL !== "0") {
+  // RECALLKEEP_SEMANTIC_RECALL=0 to fall back to full-text only.
+  if (input.query && process.env.RECALLKEEP_SEMANTIC_RECALL !== "0") {
     try {
       // Over-fetch so candidates already pulled in by the structured/FTS passes also receive a
       // similarity score. Fetching only `limit` meant a fact could sit in the pool with no
@@ -250,7 +250,7 @@ export async function recall(input: RecallInput): Promise<RecallResult> {
     // "characters" with it. Capping the FTS contribution at FTS_CEILING keeps a purely incidental
     // keyword hit from outranking a genuinely close semantic match, while still letting a strong
     // multi-term keyword hit beat a marginal one.
-    const FTS_CEILING = Number(process.env.IRA_FTS_CEILING ?? 0.55);
+    const FTS_CEILING = Number(process.env.RECALLKEEP_FTS_CEILING ?? 0.55);
     const ftsScore = ftsFactIds.has(fact.id)
       ? FTS_CEILING * (0.4 + 0.6 * (ftsRank.get(fact.id) ?? 0))
       : 0;
@@ -334,7 +334,7 @@ export async function recall(input: RecallInput): Promise<RecallResult> {
 // FTS + semantic pattern deliberately, rather than overloading one function
 // with two different candidate shapes.
 
-const MESSAGE_FTS_CEILING = Number(process.env.IRA_FTS_CEILING ?? 0.55);
+const MESSAGE_FTS_CEILING = Number(process.env.RECALLKEEP_FTS_CEILING ?? 0.55);
 
 export async function recallMessages(input: RecallMessagesInput): Promise<RecallMessagesResult> {
   const limit = Math.min(input.limit ?? 20, 100);
@@ -376,12 +376,12 @@ export async function recallMessages(input: RecallMessagesInput): Promise<Recall
 
   const semSim = new Map<string, number>();
   const allowToolMarkers = isToolQuery(input.query);
-  if (process.env.IRA_SEMANTIC_RECALL !== "0") {
+  if (process.env.RECALLKEEP_SEMANTIC_RECALL !== "0") {
     try {
       const queryVector = await generateEmbedding(input.query);
       if (queryVector.length) {
         const vectorStr = `[${queryVector.join(",")}]`;
-        const semanticFloor = Number(process.env.IRA_SEMANTIC_FLOOR ?? 0.33);
+        const semanticFloor = Number(process.env.RECALLKEEP_SEMANTIC_FLOOR ?? 0.33);
         const shortRowFloor = Math.max(semanticFloor, 0.35);
         const toolFilter = allowToolMarkers
           ? Prisma.empty

@@ -20,9 +20,9 @@ check(
 	"oldest first, [global] prefix stripped",
 	formatStandingRules([
 		fact("b", "[global] Ask first, don't assume.", "2026-11-06T00:00:00Z"),
-		fact("a", "[global] ira-memory is the source of truth.", "2026-11-05T00:00:00Z"),
+		fact("a", "[global] recallkeep is the source of truth.", "2026-11-05T00:00:00Z"),
 	]),
-	"## Standing rules (ira-memory, every project)\n- ira-memory is the source of truth.\n- Ask first, don't assume.\n",
+	"## Standing rules (RecallKeep, every project)\n- recallkeep is the source of truth.\n- Ask first, don't assume.\n",
 );
 
 check(
@@ -40,7 +40,7 @@ check(
 		[fact("a", "short rule", "2026-11-05T00:00:00Z"), fact("b", "x".repeat(50), "2026-11-06T00:00:00Z")],
 		30,
 	),
-	"## Standing rules (ira-memory, every project)\n- short rule\n",
+	"## Standing rules (RecallKeep, every project)\n- short rule\n",
 );
 
 console.log(`\n${pass} passed, ${fail} failed`);

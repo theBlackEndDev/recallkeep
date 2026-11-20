@@ -1,6 +1,6 @@
 // HTTP adapter exposing the memory API on 127.0.0.1:7775.
-// Maps /memory/* + /conversation/* onto ira-memory's Postgres store.
-// Keeps /entity/* and /kv/* in a bun:sqlite sidecar so ira-memory's
+// Maps /memory/* + /conversation/* onto recallkeep's Postgres store.
+// Keeps /entity/* and /kv/* in a bun:sqlite sidecar so recallkeep's
 // Prisma schema stays untouched.
 
 import { Database } from "bun:sqlite";
@@ -15,38 +15,38 @@ import { deriveProjectSlug } from "./summarize.js";
 import { importPiSession, isSessionFileAllowed, SESSIONS_ROOT } from "./pi-capture.js";
 import type { MemoryCategory } from "./types.js";
 
-const PORT = Number(process.env.MEMORY_API_PORT ?? 7775);
-const HOST = process.env.MEMORY_API_HOST ?? "127.0.0.1";
+const PORT = Number(process.env.RECALLKEEP_API_PORT ?? 7775);
+const HOST = process.env.RECALLKEEP_API_HOST ?? "127.0.0.1";
 
 // ─── Access control ─────────────────────────────────────────────
-// IRA_API_TOKEN: when set, every route except /health needs
+// RECALLKEEP_API_TOKEN: when set, every route except /health needs
 // `Authorization: Bearer <token>`. Required when listening on a
 // non-loopback address, because the API has no other protection.
-const API_TOKEN = process.env.IRA_API_TOKEN ?? "";
+const API_TOKEN = process.env.RECALLKEEP_API_TOKEN ?? "";
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "::1", "localhost"]);
 const isLoopback = LOOPBACK_HOSTS.has(HOST);
 if (!isLoopback && !API_TOKEN) {
   console.error(
-    `[memory-api] refusing to listen on ${HOST} without IRA_API_TOKEN. ` +
-      `Set a token, or leave MEMORY_API_HOST unset to stay on 127.0.0.1.`,
+    `[memory-api] refusing to listen on ${HOST} without RECALLKEEP_API_TOKEN. ` +
+      `Set a token, or leave RECALLKEEP_API_HOST unset to stay on 127.0.0.1.`,
   );
   process.exit(1);
 }
-// IRA_CORS_ORIGINS: comma-separated browser origins allowed to call the API.
+// RECALLKEEP_CORS_ORIGINS: comma-separated browser origins allowed to call the API.
 // Empty by default: a web page you visit must not read or write your memory.
 const CORS_ORIGINS = new Set(
-  (process.env.IRA_CORS_ORIGINS ?? "").split(",").map((s) => s.trim()).filter(Boolean),
+  (process.env.RECALLKEEP_CORS_ORIGINS ?? "").split(",").map((s) => s.trim()).filter(Boolean),
 );
 
 // ─── Sidecar DB for entities + kv ───────────────────────────────
-// IRA_SIDECAR_DB overrides the path. Installs from before 2026-11 kept it at
+// RECALLKEEP_SIDECAR_DB overrides the path. Installs from before 2026-11 kept it at
 // ~/.claude/memory-api-sidecar.db, which is still used when it exists.
 const LEGACY_SIDECAR = join(homedir(), ".claude", "memory-api-sidecar.db");
 const sidecarPath =
-  process.env.IRA_SIDECAR_DB ??
+  process.env.RECALLKEEP_SIDECAR_DB ??
   (existsSync(LEGACY_SIDECAR)
     ? LEGACY_SIDECAR
-    : join(process.env.IRA_DATA_DIR ?? join(homedir(), ".ira-memory"), "sidecar.db"));
+    : join(process.env.RECALLKEEP_DATA_DIR ?? join(homedir(), ".recallkeep"), "sidecar.db"));
 mkdirSync(dirname(sidecarPath), { recursive: true });
 const sidecar = new Database(sidecarPath);
 sidecar.exec(`
@@ -67,7 +67,7 @@ sidecar.exec(`
   );
 `);
 
-// ─── Friday memory type → ira-memory category ──────────────────
+// ─── Friday memory type → recallkeep category ──────────────────
 const TYPE_TO_CATEGORY: Record<string, MemoryCategory> = {
   user: "PREFERENCE",
   feedback: "LESSON",
@@ -216,7 +216,7 @@ async function route(req: Request): Promise<Response> {
   try {
     // ── Health ──
     if (pathname === "/health") {
-      return json({ status: "ok", backend: "ira-memory", port: PORT });
+      return json({ status: "ok", backend: "recallkeep", port: PORT });
     }
 
     // ── Conversation ──
@@ -303,7 +303,7 @@ async function route(req: Request): Promise<Response> {
       return json(serializeMessage(message));
     }
 
-    // Pi session capture (plan: pi-ira-memory-capture.md §3.2B). The pi
+    // Pi session capture (plan: pi-recallkeep-capture.md §3.2B). The pi
     // memory extension sends a file path, never message content — this
     // endpoint reads the JSONL itself. Returns 202 immediately; import runs
     // async so a slow/large session sync never holds up the 800ms client
@@ -506,7 +506,7 @@ async function warmUp(): Promise<void> {
     recall({ query: "warm up", limit: 1 }),
     recallMessages({ query: "warm up", limit: 1 }),
   ]);
-  await Promise.race([work, new Promise((r) => setTimeout(r, Number(process.env.IRA_WARMUP_MS ?? 15_000)))]);
+  await Promise.race([work, new Promise((r) => setTimeout(r, Number(process.env.RECALLKEEP_WARMUP_MS ?? 15_000)))]);
   console.log(`[memory-api] warm-up took ${Date.now() - started}ms`);
 }
 await warmUp();
@@ -519,5 +519,5 @@ const server = Bun.serve({
 });
 
 console.log(`[memory-api] listening on http://${server.hostname}:${server.port}`);
-console.log(`[memory-api] backend: ira-memory (Postgres) + sidecar sqlite at ${sidecarPath}`);
-if (API_TOKEN) console.log("[memory-api] bearer token required (IRA_API_TOKEN)");
+console.log(`[memory-api] backend: recallkeep (Postgres) + sidecar sqlite at ${sidecarPath}`);
+if (API_TOKEN) console.log("[memory-api] bearer token required (RECALLKEEP_API_TOKEN)");

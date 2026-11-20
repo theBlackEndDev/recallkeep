@@ -1,5 +1,5 @@
 /**
- * ira-memory HTTP client.
+ * recallkeep HTTP client.
  *
  * `global.fetch` is replaced with a fake for the duration of each check, then
  * restored, so these tests never touch the network or the real service.
@@ -84,12 +84,12 @@ await withFetch(
 		check(
 			"syncSession body",
 			JSON.parse(init?.body as string),
-			{ sessionFile: "/workspace/dev/.pi/agent/sessions/x/y.jsonl", sessionId: "sid1", cwd: "/workspace/dev/Projects/ira-memory", final: false },
+			{ sessionFile: "/workspace/dev/.pi/agent/sessions/x/y.jsonl", sessionId: "sid1", cwd: "/workspace/dev/Projects/recallkeep", final: false },
 		);
 		return okResponse({ accepted: true });
 	}) as typeof fetch,
 	async () => {
-		const result = await syncSession("/workspace/dev/.pi/agent/sessions/x/y.jsonl", "sid1", "/workspace/dev/Projects/ira-memory");
+		const result = await syncSession("/workspace/dev/.pi/agent/sessions/x/y.jsonl", "sid1", "/workspace/dev/Projects/recallkeep");
 		check("syncSession result", result, { accepted: true });
 	},
 );
@@ -104,7 +104,7 @@ await withFetch(
 		return okResponse({ accepted: true });
 	}) as typeof fetch,
 	async () => {
-		await syncSession("/workspace/dev/.pi/agent/sessions/x/y.jsonl", "sid1", "/workspace/dev/Projects/ira-memory", true);
+		await syncSession("/workspace/dev/.pi/agent/sessions/x/y.jsonl", "sid1", "/workspace/dev/Projects/recallkeep", true);
 	},
 );
 
@@ -120,7 +120,7 @@ await withFetch(
 			{
 				content: "worked on X",
 				type: "project",
-				tags: ["project:ira-memory", "pi:handoff"],
+				tags: ["project:recallkeep", "pi:handoff"],
 			},
 		);
 		return okResponse({
@@ -131,12 +131,12 @@ await withFetch(
 			content: "worked on X",
 			category: "PROJECT_STATE",
 			tier: "LONG_TERM",
-			tags: ["project:ira-memory", "pi:handoff"],
+			tags: ["project:recallkeep", "pi:handoff"],
 			created_at: "2026-01-01T00:00:00.000Z",
 		});
 	}) as typeof fetch,
 	async () => {
-		const result = await writeHandoff("project:ira-memory", "worked on X");
+		const result = await writeHandoff("project:recallkeep", "worked on X");
 		check("writeHandoff result id", result?.id, "f1");
 	},
 );
@@ -148,12 +148,12 @@ await withFetch(
 		check(
 			"listFacts URL",
 			String(url),
-			"http://127.0.0.1:7775/memory/list?project=ira-memory&limit=25",
+			"http://127.0.0.1:7775/memory/list?project=recallkeep&limit=25",
 		);
 		return okResponse({ facts: [{ id: "f1" }], total: 1 });
 	}) as typeof fetch,
 	async () => {
-		const facts = await listFacts("ira-memory", 25);
+		const facts = await listFacts("recallkeep", 25);
 		check("listFacts result length", facts.length, 1);
 	},
 );
@@ -165,12 +165,12 @@ await withFetch(
 		check(
 			"recentMessages URL",
 			String(url),
-			"http://127.0.0.1:7775/conversation/recent?channel=pi%3Aira-memory&limit=10",
+			"http://127.0.0.1:7775/conversation/recent?channel=pi%3Arecallkeep&limit=10",
 		);
 		return okResponse({ messages: [{ id: "m1" }] });
 	}) as typeof fetch,
 	async () => {
-		const messages = await recentMessages("pi:ira-memory", 10);
+		const messages = await recentMessages("pi:recallkeep", 10);
 		check("recentMessages result length", messages.length, 1);
 	},
 );
@@ -180,11 +180,11 @@ await withFetch(
 await withFetch(
 	(async (url: RequestInfo | URL) => {
 		check("health URL", String(url), "http://127.0.0.1:7775/health");
-		return okResponse({ status: "ok", backend: "ira-memory", port: 7775 });
+		return okResponse({ status: "ok", backend: "recallkeep", port: 7775 });
 	}) as typeof fetch,
 	async () => {
 		const result = await health();
-		check("health result", result, { status: "ok", backend: "ira-memory", port: 7775 });
+		check("health result", result, { status: "ok", backend: "recallkeep", port: 7775 });
 	},
 );
 
@@ -326,15 +326,15 @@ await withFetch(
 	},
 );
 
-// --- IRA_API_TOKEN: bearer header sent when set, absent otherwise ---
+// --- RECALLKEEP_API_TOKEN: bearer header sent when set, absent otherwise ---
 
-const prevToken = process.env.IRA_API_TOKEN;
-process.env.IRA_API_TOKEN = "test-token";
+const prevToken = process.env.RECALLKEEP_API_TOKEN;
+process.env.RECALLKEEP_API_TOKEN = "test-token";
 await withFetch(
 	(async (_url: RequestInfo | URL, init?: RequestInit) => {
 		const headers = init?.headers as Record<string, string>;
-		check("bearer header sent when IRA_API_TOKEN is set", headers?.Authorization, "Bearer test-token");
-		return okResponse({ status: "ok", backend: "ira-memory", port: 7775 });
+		check("bearer header sent when RECALLKEEP_API_TOKEN is set", headers?.Authorization, "Bearer test-token");
+		return okResponse({ status: "ok", backend: "recallkeep", port: 7775 });
 	}) as typeof fetch,
 	async () => {
 		await health();
@@ -351,18 +351,18 @@ await withFetch(
 		await writeHandoff("project:x", "c");
 	},
 );
-delete process.env.IRA_API_TOKEN;
+delete process.env.RECALLKEEP_API_TOKEN;
 await withFetch(
 	(async (_url: RequestInfo | URL, init?: RequestInit) => {
 		const headers = (init?.headers ?? {}) as Record<string, string>;
-		check("no Authorization header when IRA_API_TOKEN is unset", headers.Authorization, undefined);
+		check("no Authorization header when RECALLKEEP_API_TOKEN is unset", headers.Authorization, undefined);
 		return okResponse({});
 	}) as typeof fetch,
 	async () => {
 		await health();
 	},
 );
-if (prevToken !== undefined) process.env.IRA_API_TOKEN = prevToken;
+if (prevToken !== undefined) process.env.RECALLKEEP_API_TOKEN = prevToken;
 
 console.log(`\n${pass} passed, ${fail} failed`);
 // Only exit on failure: exiting 0 here would kill the shared bun process before

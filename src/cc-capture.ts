@@ -3,7 +3,7 @@
  * cc-capture.ts - Claude Code SessionEnd hook for capturing conversations.
  *
  * Reads the CC hook JSON from stdin, parses the transcript.jsonl,
- * and bulk-imports user/assistant messages into ira-memory.
+ * and bulk-imports user/assistant messages into recallkeep.
  *
  * Usage (called automatically by Claude Code SessionEnd hook):
  *   echo '{"session_id":"...","transcript_path":"..."}' | bun run src/cc-capture.ts
@@ -16,7 +16,7 @@ import { readFileSync, appendFileSync } from "fs";
 import { hostname } from "os";
 import { redactBatch } from "./redact.js";
 
-const DEBUG_LOG = "/tmp/ira-cc-capture.log";
+const DEBUG_LOG = "/tmp/recallkeep-cc-capture.log";
 function dlog(msg: string) {
   try {
     appendFileSync(DEBUG_LOG, `[${new Date().toISOString()}] ${msg}\n`);

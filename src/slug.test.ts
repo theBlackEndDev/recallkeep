@@ -13,13 +13,13 @@ import { deriveProjectSlug } from "./summarize.js";
 
 // --- nested paths collapse to the project root ---
 test("nested path collapses to project root", () => {
-  expect(deriveProjectSlug("/home/dev/Projects/ira-memory/src/db")).toBe("ira-memory");
+  expect(deriveProjectSlug("/home/dev/Projects/recallkeep/src/db")).toBe("recallkeep");
 });
 test("project root, no trailing slash", () => {
-  expect(deriveProjectSlug("/home/dev/Projects/ira-memory")).toBe("ira-memory");
+  expect(deriveProjectSlug("/home/dev/Projects/recallkeep")).toBe("recallkeep");
 });
 test("project root, trailing slash", () => {
-  expect(deriveProjectSlug("/home/dev/Projects/ira-memory/")).toBe("ira-memory");
+  expect(deriveProjectSlug("/home/dev/Projects/recallkeep/")).toBe("recallkeep");
 });
 
 // --- Projects root catch-all — deliberate, not a bug (plan D2) ---
@@ -68,8 +68,8 @@ test("empty string returns null", () => {
 
 // --- parity fixtures shared with the pi extension's slug.test.ts ---
 const PARITY_FIXTURES: Array<[cwd: string, slug: string | null]> = [
-  ["/home/dev/Projects/ira-memory/src/db", "ira-memory"],
-  ["/home/dev/Projects/ira-memory", "ira-memory"],
+  ["/home/dev/Projects/recallkeep/src/db", "recallkeep"],
+  ["/home/dev/Projects/recallkeep", "recallkeep"],
   ["/home/dev/Projects", "Projects"],
   ["~/Projects/", "Projects"],
   ["/srv/projects/widget-api", "widget-api"],

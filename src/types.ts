@@ -238,7 +238,7 @@ export interface SynthesizeResult {
   confidence: number;
 }
 
-// ─── Recall messages (Phase 5: pi-ira-memory-capture.md) ────────────
+// ─── Recall messages (Phase 5: pi-recallkeep-capture.md) ────────────
 
 export interface RecallMessagesInput {
   query: string;
@@ -252,7 +252,7 @@ export interface RecallMessagesResult {
   messages: Array<Message & { score: number; channel: string | null }>;
 }
 
-// ─── Decisions extraction (Phase 6: pi-ira-memory-capture.md) ────────
+// ─── Decisions extraction (Phase 6: pi-recallkeep-capture.md) ────────
 
 export interface ExtractDecisionsInput {
   sessionId: string;

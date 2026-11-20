@@ -3,7 +3,7 @@ import { getClient, embeddingsEnabled, EMBED_MODEL, EMBED_DIMS, EMBED_SUPPORTS_D
 
 /**
  * Generate embedding for text via the configured provider (OpenAI / Gemini / local / none).
- * Returns [] when embeddings are disabled (IRA_LLM_PROVIDER=none or IRA_EMBED=off) — callers skip
+ * Returns [] when embeddings are disabled (RECALLKEEP_LLM_PROVIDER=none or RECALLKEEP_EMBED=off) — callers skip
  * storing, and semantic recall transparently falls back to full-text + structured search.
  * Requests EMBED_DIMS for providers that support it, so OpenAI and Gemini both emit vectors that
  * match the pgvector schema (1536) without a migration.
@@ -29,7 +29,7 @@ export function fitToSchema(vec: number[], dims = EMBED_DIMS): number[] {
   if (vec.length === dims) return vec;
   if (vec.length > dims) {
     throw new Error(
-      `embedding has ${vec.length} dims but the schema holds ${dims}; pick a smaller model or set IRA_EMBED_DIMS on a fresh DB`,
+      `embedding has ${vec.length} dims but the schema holds ${dims}; pick a smaller model or set RECALLKEEP_EMBED_DIMS on a fresh DB`,
     );
   }
   return vec.concat(new Array(dims - vec.length).fill(0));
@@ -41,13 +41,13 @@ export function fitToSchema(vec: number[], dims = EMBED_DIMS): number[] {
  * is semantic, not technical: one vector averages everything it covers, so an oversized chunk
  * produces a blurred embedding that matches everything weakly and nothing strongly.
  */
-const CHUNK_CHARS = Number(process.env.IRA_CHUNK_CHARS ?? 6000);
+const CHUNK_CHARS = Number(process.env.RECALLKEEP_CHUNK_CHARS ?? 6000);
 
 /**
  * Overlap between adjacent chunks. Without it, a concept that straddles a boundary is split across
  * two vectors and matches neither well.
  */
-const CHUNK_OVERLAP = Number(process.env.IRA_CHUNK_OVERLAP ?? 400);
+const CHUNK_OVERLAP = Number(process.env.RECALLKEEP_CHUNK_OVERLAP ?? 400);
 
 /**
  * Split text for embedding, preferring natural boundaries so chunks stay locally coherent:

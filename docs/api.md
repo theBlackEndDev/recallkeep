@@ -11,16 +11,16 @@ bun run memory-api
 # → [memory-api] listening on http://127.0.0.1:7775
 ```
 
-The server binds to `MEMORY_API_HOST` (default `127.0.0.1`) on `MEMORY_API_PORT` (default `7775`). The server refuses to start on any non-loopback host unless `IRA_API_TOKEN` is set. See [privacy.md](privacy.md) for the full exposure rules.
+The server binds to `RECALLKEEP_API_HOST` (default `127.0.0.1`) on `RECALLKEEP_API_PORT` (default `7775`). The server refuses to start on any non-loopback host unless `RECALLKEEP_API_TOKEN` is set. See [privacy.md](privacy.md) for the full exposure rules.
 
 ## Authentication and headers
 
 | Header | Used by | Effect |
 |--------|---------|--------|
-| `Authorization: Bearer <token>` | every route except `/health` | Required when `IRA_API_TOKEN` is set. Otherwise the route returns `401`. |
+| `Authorization: Bearer <token>` | every route except `/health` | Required when `RECALLKEEP_API_TOKEN` is set. Otherwise the route returns `401`. |
 | `X-Project: <slug>` | recall and list routes | Hard filter. Results are limited to that project. |
 | `X-Cwd: <path>` | recall routes | The project slug is derived from the path. It gives a soft boost, not a filter, so other projects still appear. |
-| `Origin` | every route | Requests with an `Origin` not listed in `IRA_CORS_ORIGINS` get `403`. Requests without an `Origin` (agents, hooks, curl) pass. |
+| `Origin` | every route | Requests with an `Origin` not listed in `RECALLKEEP_CORS_ORIGINS` get `403`. Requests without an `Origin` (agents, hooks, curl) pass. |
 
 Project scoping works in two modes. `?project=` or `X-Project` filters strictly. `X-Cwd` boosts. Use `X-Cwd` for ambient, per-prompt recall, and use `?project=` when you want only one project's facts.
 
@@ -100,4 +100,4 @@ The CLI and the HTTP API read the same data. For commands, see [cli.md](cli.md).
 
 - [integrations/pi/API.md](../integrations/pi/API.md): the pi extension's client view of this API.
 - [privacy.md](privacy.md): token, CORS, and bind-address rules.
-- [configuration.md](configuration.md): the `MEMORY_API_*` and `IRA_API_TOKEN` variables.
+- [configuration.md](configuration.md): the `MEMORY_API_*` and `RECALLKEEP_API_TOKEN` variables.

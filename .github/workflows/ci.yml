@@ -16,19 +16,19 @@ jobs:
       postgres:
         image: pgvector/pgvector:pg16
         env:
-          POSTGRES_DB: ira_memory_test
-          POSTGRES_USER: ira_memory
+          POSTGRES_DB: recallkeep_test
+          POSTGRES_USER: recallkeep
           POSTGRES_PASSWORD: ci
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U ira_memory -d ira_memory_test"
+          --health-cmd "pg_isready -U recallkeep -d recallkeep_test"
           --health-interval 5s --health-timeout 3s --health-retries 10
     env:
-      MEMORY_DATABASE_URL: postgresql://ira_memory:ci@localhost:5432/ira_memory_test
-      IRA_TEST_DATABASE_URL: postgresql://ira_memory:ci@localhost:5432/ira_memory_test
-      SMOKE_DATABASE_URL: postgresql://ira_memory:ci@localhost:5432/ira_memory_test
-      IRA_LLM_PROVIDER: none
+      RECALLKEEP_DATABASE_URL: postgresql://recallkeep:ci@localhost:5432/recallkeep_test
+      RECALLKEEP_TEST_DATABASE_URL: postgresql://recallkeep:ci@localhost:5432/recallkeep_test
+      SMOKE_DATABASE_URL: postgresql://recallkeep:ci@localhost:5432/recallkeep_test
+      RECALLKEEP_LLM_PROVIDER: none
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2

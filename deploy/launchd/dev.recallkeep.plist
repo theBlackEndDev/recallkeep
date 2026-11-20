@@ -1,25 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  macOS: start ira-memory at login and restart it if it crashes.
+  macOS: start recallkeep at login and restart it if it crashes.
 
-  1. Replace every /PATH/TO/ira-memory and /Users/YOU below.
-  2. cp deploy/launchd/dev.ira-memory.plist ~/Library/LaunchAgents/
-  3. launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/dev.ira-memory.plist
-  Logs: ~/Library/Logs/ira-memory.{out,err}.log
-  Stop: launchctl bootout gui/$(id -u)/dev.ira-memory
+  1. Replace every /PATH/TO/recallkeep and /Users/YOU below.
+  2. cp deploy/launchd/dev.recallkeep.plist ~/Library/LaunchAgents/
+  3. launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/dev.recallkeep.plist
+  Logs: ~/Library/Logs/recallkeep.{out,err}.log
+  Stop: launchctl bootout gui/$(id -u)/dev.recallkeep
 -->
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>dev.ira-memory</string>
+  <string>dev.recallkeep</string>
   <key>ProgramArguments</key>
   <array>
     <string>/bin/bash</string>
-    <string>/PATH/TO/ira-memory/scripts/start.sh</string>
+    <string>/PATH/TO/recallkeep/scripts/start.sh</string>
   </array>
   <key>WorkingDirectory</key>
-  <string>/PATH/TO/ira-memory</string>
+  <string>/PATH/TO/recallkeep</string>
   <key>EnvironmentVariables</key>
   <dict>
     <!-- launchd starts with a minimal PATH: include bun and docker. -->
@@ -34,8 +34,8 @@
     <false/>
   </dict>
   <key>StandardOutPath</key>
-  <string>/Users/YOU/Library/Logs/ira-memory.out.log</string>
+  <string>/Users/YOU/Library/Logs/recallkeep.out.log</string>
   <key>StandardErrorPath</key>
-  <string>/Users/YOU/Library/Logs/ira-memory.err.log</string>
+  <string>/Users/YOU/Library/Logs/recallkeep.err.log</string>
 </dict>
 </plist>

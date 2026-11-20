@@ -9,14 +9,14 @@ This file covers the repo layout, the programmatic API, how to run the tests, CI
 The database is a Docker container defined in `docker-compose.yml`.
 
 - **Image:** `pgvector/pgvector:pg16` (PostgreSQL 16 with the pgvector extension).
-- **Port:** published on loopback only, on `IRA_DB_PORT` (default `5433`, mapped from the container's `5432`). See [privacy.md](privacy.md#postgres).
+- **Port:** published on loopback only, on `RECALLKEEP_DB_PORT` (default `5433`, mapped from the container's `5432`). See [privacy.md](privacy.md#postgres).
 - **Extensions:** `vector` (pgvector) and `pg_trgm` (trigram fuzzy search).
 - **Indexes:** HNSW on the vector columns, for cosine search. HNSW was chosen over IVFFlat because IVFFlat needs data present when it is built, and its recall drops as the table grows. GIN on the tsvector columns for full-text search. GIN with trigram operators on the content columns.
 
 ## Repository layout
 
 ```
-ira-memory/
+recallkeep/
 ├── prisma/
 │   ├── schema.prisma                  Data model
 │   └── migrations/                    Prisma and custom SQL migrations
@@ -69,8 +69,8 @@ ira-memory/
 │   ├── install-pre-push-hook.sh       Install the pre-push hook into repos
 │   └── test-pre-push-hook.sh          Tests for the pre-push hook
 ├── deploy/
-│   ├── systemd/ira-memory.service     Example systemd unit
-│   └── launchd/dev.ira-memory.plist   Example launchd job
+│   ├── systemd/recallkeep.service     Example systemd unit
+│   └── launchd/dev.recallkeep.plist   Example launchd job
 ├── .github/workflows/ci.yml           CI pipeline
 ├── docker-compose.yml                 Postgres 16 with pgvector
 ├── .env.example                       Every configuration variable, documented
@@ -126,7 +126,7 @@ const similar = await semanticSearch({
 const { summary } = await closeSession(session.id);
 ```
 
-When `IRA_LLM_PROVIDER=none`, `store` still saves the fact. It just skips embedding and learning, and `closeSession` returns no summary.
+When `RECALLKEEP_LLM_PROVIDER=none`, `store` still saves the fact. It just skips embedding and learning, and `closeSession` returns no summary.
 
 ## Running the tests
 
@@ -138,27 +138,27 @@ There are three kinds of check.
 bun test
 ```
 
-`bun test` runs every `*.test.ts` file in `src/` and `integrations/pi/`. Pure tests run with no setup. Database tests are skipped unless `IRA_TEST_DATABASE_URL` is set. Set it to a throwaway database that has been migrated:
+`bun test` runs every `*.test.ts` file in `src/` and `integrations/pi/`. Pure tests run with no setup. Database tests are skipped unless `RECALLKEEP_TEST_DATABASE_URL` is set. Set it to a throwaway database that has been migrated:
 
 ```bash
-export IRA_TEST_DATABASE_URL=postgresql://ira_memory:<password>@localhost:5433/ira_memory_test
-bunx prisma migrate deploy   # with MEMORY_DATABASE_URL pointing at that database
+export RECALLKEEP_TEST_DATABASE_URL=postgresql://recallkeep:<password>@localhost:5433/recallkeep_test
+bunx prisma migrate deploy   # with RECALLKEEP_DATABASE_URL pointing at that database
 bun test
 ```
 
-Use a separate database. The tests write rows, so never point `IRA_TEST_DATABASE_URL` at the database you use for real memory.
+Use a separate database. The tests write rows, so never point `RECALLKEEP_TEST_DATABASE_URL` at the database you use for real memory.
 
 The test files use a plain assertion-counter pattern, not `bun:test`'s `test()` and `expect()`. So `bun test` reports `0 pass, 0 fail`, and each file prints its own count. Each file must still call `await main()` at the top level. If it does not, `bun test` drops the output silently.
 
 ### Contract smoke test: `bun scripts/smoke.ts`
 
 ```bash
-SMOKE_DATABASE_URL=postgresql://ira_memory:<password>@localhost:5433/ira_memory_test bun scripts/smoke.ts > after.txt
+SMOKE_DATABASE_URL=postgresql://recallkeep:<password>@localhost:5433/recallkeep_test bun scripts/smoke.ts > after.txt
 ```
 
 The smoke test starts an isolated HTTP server on port `7799` and a temporary `HOME`. It sets the provider to `none`. It then records the status code and JSON shape of every endpoint, plus the exit code of each CLI command. Run it before and after a change and compare the two outputs with `diff`.
 
-It refuses to run against any database whose name is `ira_memory` (the main database). The database must already be migrated.
+It refuses to run against any database whose name is `recallkeep` (the main database). The database must already be migrated.
 
 ### End-to-end script: `bun run src/test-e2e.ts`
 
@@ -185,10 +185,10 @@ Point it at a throwaway instance on port `7776`, never at the live service on `7
 1. `bun install --frozen-lockfile`
 2. `bunx prisma generate` and `bunx prisma migrate deploy`
 3. `bun run typecheck`
-4. `bun test` (database tests run, because `IRA_TEST_DATABASE_URL` is set)
+4. `bun test` (database tests run, because `RECALLKEEP_TEST_DATABASE_URL` is set)
 5. `bun scripts/smoke.ts`
 
-CI sets `IRA_LLM_PROVIDER=none`, so no external calls are made.
+CI sets `RECALLKEEP_LLM_PROVIDER=none`, so no external calls are made.
 
 ## Pre-push secret scan
 

@@ -9,22 +9,22 @@
 // below reproduces that conversation synthetically.
 //
 // DB isolation: this file writes to Postgres, so it only runs when
-// IRA_TEST_DATABASE_URL points at a throwaway, already-migrated database.
-// Bun auto-loads .env, so the real MEMORY_DATABASE_URL is always present in
+// RECALLKEEP_TEST_DATABASE_URL points at a throwaway, already-migrated database.
+// Bun auto-loads .env, so the real RECALLKEEP_DATABASE_URL is always present in
 // the environment — it is overwritten below BEFORE the Prisma client is
 // imported, and the modules are loaded with dynamic import for that reason.
-// Embeddings are disabled (IRA_LLM_PROVIDER=none): the assertions are
+// Embeddings are disabled (RECALLKEEP_LLM_PROVIDER=none): the assertions are
 // satisfied by the full-text layer alone, so no OpenAI call is made.
 
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import { isToolMarker, isToolQuery } from "./search.js";
 
-const TEST_DB_URL = process.env.IRA_TEST_DATABASE_URL;
+const TEST_DB_URL = process.env.RECALLKEEP_TEST_DATABASE_URL;
 if (TEST_DB_URL) {
-  process.env.MEMORY_DATABASE_URL = TEST_DB_URL;
-  process.env.IRA_LLM_PROVIDER = "none";
+  process.env.RECALLKEEP_DATABASE_URL = TEST_DB_URL;
+  process.env.RECALLKEEP_LLM_PROVIDER = "none";
 } else {
-  delete process.env.MEMORY_DATABASE_URL;
+  delete process.env.RECALLKEEP_DATABASE_URL;
 }
 
 describe("isToolMarker / isToolQuery (pure helpers)", () => {
@@ -49,7 +49,7 @@ describe("isToolMarker / isToolQuery (pure helpers)", () => {
   });
 });
 
-describe.skipIf(!TEST_DB_URL)("recallMessages (needs IRA_TEST_DATABASE_URL)", () => {
+describe.skipIf(!TEST_DB_URL)("recallMessages (needs RECALLKEEP_TEST_DATABASE_URL)", () => {
   let recallMessages: typeof import("./recall.js").recallMessages;
   let prisma: typeof import("./client.js").prisma;
   let sessionId: string;
@@ -101,7 +101,7 @@ describe.skipIf(!TEST_DB_URL)("recallMessages (needs IRA_TEST_DATABASE_URL)", ()
 
   test("same query scoped to an unrelated project returns no more hits than the real one (project filter is not a no-op)", async () => {
     const inScope = await recallMessages({ query: "Crossroads", project: "sample-novel", limit: 10 });
-    const outOfScope = await recallMessages({ query: "Crossroads", project: "ira-memory", limit: 10 });
+    const outOfScope = await recallMessages({ query: "Crossroads", project: "recallkeep", limit: 10 });
     expect(outOfScope.messages.length).toBeLessThanOrEqual(inScope.messages.length);
   });
 

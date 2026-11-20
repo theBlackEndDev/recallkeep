@@ -1,22 +1,25 @@
+# The project name is pinned so the volume and container names do not depend on the folder name.
+name: recallkeep
+
 services:
-  ira-memory-db:
+  db:
     image: pgvector/pgvector:pg16
     restart: unless-stopped
     ports:
       # Loopback only: the default password is public, so never publish this on the LAN.
-      - "127.0.0.1:${IRA_DB_PORT:-5433}:5432"
-      - "[::1]:${IRA_DB_PORT:-5433}:5432"
+      - "127.0.0.1:${RECALLKEEP_DB_PORT:-5433}:5432"
+      - "[::1]:${RECALLKEEP_DB_PORT:-5433}:5432"
     volumes:
-      - ira-memory-db-data:/var/lib/postgresql/data
+      - recallkeep-db-data:/var/lib/postgresql/data
     environment:
-      POSTGRES_DB: ira_memory
-      POSTGRES_USER: ira_memory
-      POSTGRES_PASSWORD: ${IRA_DB_PASSWORD:-ira_memory_secret}
+      POSTGRES_DB: recallkeep
+      POSTGRES_USER: recallkeep
+      POSTGRES_PASSWORD: ${RECALLKEEP_DB_PASSWORD:-recallkeep_secret}
     healthcheck:
-      test: pg_isready -U ira_memory -d ira_memory
+      test: pg_isready -U recallkeep -d recallkeep
       interval: 10s
       timeout: 3s
       retries: 3
 
 volumes:
-  ira-memory-db-data:
+  recallkeep-db-data:

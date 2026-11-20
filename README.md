@@ -2,7 +2,7 @@
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.png">
     <source media="(prefers-color-scheme: light)" srcset="docs/assets/logo-light.png">
-    <img alt="ira-memory" src="docs/assets/logo-light.png" width="420">
+    <img alt="RecallKeep" src="docs/assets/logo-light.png" width="420">
   </picture>
 </p>
 
@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/theBlackEndDev/ira-memory/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/theBlackEndDev/ira-memory/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/theBlackEndDev/recallkeep/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/theBlackEndDev/recallkeep/actions/workflows/ci.yml/badge.svg"></a>
   <a href="#license"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-blue?style=flat"></a>
   <img alt="Runs on Bun" src="https://img.shields.io/badge/runtime-Bun-f9f1e1?style=flat&logo=bun&logoColor=black">
   <img alt="Postgres + pgvector" src="https://img.shields.io/badge/storage-Postgres%20%2B%20pgvector-336791?style=flat&logo=postgresql&logoColor=white">
@@ -28,7 +28,7 @@
 </p>
 
 Every time you start a new session, your coding agent has forgotten what you decided yesterday. You explain
-the same rules again, and it reopens questions you already settled. ira-memory fixes this. It keeps your
+the same rules again, and it reopens questions you already settled. RecallKeep fixes this. It keeps your
 decisions, facts and past conversations in a Postgres database on your machine. It gives the relevant ones
 back to the agent at the start of each session and with each prompt you send.
 
@@ -43,8 +43,8 @@ CLI**. Several agents can share one memory, so a decision made in Claude Code is
 
 <table>
   <tr>
-    <th width="50%">Without ira-memory</th>
-    <th width="50%">With ira-memory</th>
+    <th width="50%">Without recallkeep</th>
+    <th width="50%">With recallkeep</th>
   </tr>
   <tr>
     <td>Each session starts empty. You paste the same project rules again.</td>
@@ -68,7 +68,7 @@ CLI**. Several agents can share one memory, so a decision made in Claude Code is
 
 - **Context at session start.** The agent gets your standing rules (for every project), the locked decisions
   for this project, and its newest facts.
-- **Recall for each prompt.** Before the agent reads your prompt, ira-memory adds the stored facts that best
+- **Recall for each prompt.** Before the agent reads your prompt, RecallKeep adds the stored facts that best
   match it.
 - **Agent tools.** `memory_search`, `memory_save`, `memory_context`, `memory_list` and `memory_forget` work in
   any MCP client.
@@ -92,20 +92,20 @@ You need:
 
 - [Bun](https://bun.sh) 1.2 or newer.
 - [Docker](https://docs.docker.com/get-docker/) to run Postgres with pgvector. Any Postgres 16 with the
-  `vector` and `pg_trgm` extensions also works. Point `MEMORY_DATABASE_URL` at it.
+  `vector` and `pg_trgm` extensions also works. Point `RECALLKEEP_DATABASE_URL` at it.
 - Optional: an OpenAI or Gemini API key, or [Ollama](https://ollama.com), for semantic search and summaries.
-  Without one, ira-memory still works, and search uses full text and project tags.
+  Without one, RecallKeep still works, and search uses full text and project tags.
 
 ## Quickstart
 
 This setup uses no API key and makes no external calls. It takes about five minutes.
 
 ```bash
-git clone https://github.com/theBlackEndDev/ira-memory.git
-cd ira-memory
+git clone https://github.com/theBlackEndDev/recallkeep.git
+cd recallkeep
 bun install
 cp .env.example .env
-echo 'IRA_LLM_PROVIDER="none"' >> .env   # no LLM; change this later, see below
+echo 'RECALLKEEP_LLM_PROVIDER="none"' >> .env   # no LLM; change this later, see below
 
 docker compose up -d                     # Postgres + pgvector on 127.0.0.1:5433
 bunx prisma migrate deploy               # create the tables
@@ -116,7 +116,7 @@ Leave that running, and open a second terminal to check that it works:
 
 ```bash
 curl -s http://127.0.0.1:7775/health
-# {"status":"ok","backend":"ira-memory","port":7775}
+# {"status":"ok","backend":"recallkeep","port":7775}
 
 curl -s -X POST http://127.0.0.1:7775/memory \
   -H 'Content-Type: application/json' \
@@ -125,12 +125,12 @@ curl -s -X POST http://127.0.0.1:7775/memory \
 bun run src/cli.ts recall --query "how do we deploy"
 ```
 
-Next, [connect your agent](#connect-your-agent). To start ira-memory at login, see
+Next, [connect your agent](#connect-your-agent). To start RecallKeep at login, see
 [Run it in the background](#run-it-in-the-background).
 
 ### Choose an LLM provider
 
-The LLM computes embeddings for semantic search, and it writes summaries. Set `IRA_LLM_PROVIDER` in `.env`:
+The LLM computes embeddings for semantic search, and it writes summaries. Set `RECALLKEEP_LLM_PROVIDER` in `.env`:
 
 | Provider | What you need | What leaves your machine |
 |---|---|---|
@@ -147,12 +147,12 @@ To fill in embeddings later, run `bun run src/cli.ts backfill`. Details:
 
 Each agent gets two things:
 
-1. **The MCP server** for the tools. The agent starts it with `bun /PATH/TO/ira-memory/src/cli.ts mcp`.
+1. **The MCP server** for the tools. The agent starts it with `bun /PATH/TO/recallkeep/src/cli.ts mcp`.
    The server talks to the API you started above.
 2. **Hooks** for automatic memory: context at session start, recall on each prompt, and turn logging.
-   Hooks fail open. If ira-memory is down, the agent runs as normal.
+   Hooks fail open. If RecallKeep is down, the agent runs as normal.
 
-In the commands below, replace `/PATH/TO/ira-memory` with the full path to your clone (run `pwd` inside it).
+In the commands below, replace `/PATH/TO/recallkeep` with the full path to your clone (run `pwd` inside it).
 The MCP tools are the same in every agent:
 
 | Tool | What it does |
@@ -168,7 +168,7 @@ The MCP tools are the same in every agent:
 Verified with Claude Code 2.1.327.
 
 ```bash
-claude mcp add ira-memory -s user -- bun /PATH/TO/ira-memory/src/cli.ts mcp
+claude mcp add recallkeep -s user -- bun /PATH/TO/recallkeep/src/cli.ts mcp
 ```
 
 Copy the `hooks` block from [`integrations/claude-code/settings.json`](integrations/claude-code/settings.json)
@@ -179,7 +179,7 @@ into `~/.claude/settings.json` for all projects, or into `.claude/settings.json`
 Verified with Codex CLI 0.167.1.
 
 Add [`integrations/codex/config.toml`](integrations/codex/config.toml) to `~/.codex/config.toml`. Codex asks you
-to trust new hooks: open `/hooks` in Codex and approve the three ira-memory hooks. In testing, Codex did not
+to trust new hooks: open `/hooks` in Codex and approve the three RecallKeep hooks. In testing, Codex did not
 load hooks from a project's `.codex/hooks.json`, but it did load the inline `[hooks]` tables in
 `config.toml`.
 
@@ -188,12 +188,12 @@ load hooks from a project's `.codex/hooks.json`, but it did load the inline `[ho
 Verified with `agy` 1.5.13. Antigravity CLI replaced Gemini CLI.
 
 ```bash
-agy mcp add ira-memory bun /PATH/TO/ira-memory/src/cli.ts mcp
+agy mcp add recallkeep bun /PATH/TO/recallkeep/src/cli.ts mcp
 ```
 
 Copy [`integrations/antigravity/hooks.json`](integrations/antigravity/hooks.json) to `.agents/hooks.json` in your
 workspace, or to `~/.gemini/config/hooks.json` for all workspaces. `agy` has no prompt-submit event, so the
-recall hook runs on `PreInvocation`. ira-memory looks up memory once per turn and reuses the result for the
+recall hook runs on `PreInvocation`. RecallKeep looks up memory once per turn and reuses the result for the
 other model calls in that turn.
 
 ### pi
@@ -204,16 +204,16 @@ tools plus the `/memory` and `/handoff` commands.
 
 ```bash
 mkdir -p ~/.pi/agent/extensions
-cp -R /PATH/TO/ira-memory/integrations/pi ~/.pi/agent/extensions/memory
+cp -R /PATH/TO/recallkeep/integrations/pi ~/.pi/agent/extensions/memory
 ```
 
 See [`integrations/pi/README.md`](integrations/pi/README.md). For the tools only, use
-`pi mcp add ira-memory -- bun /PATH/TO/ira-memory/src/cli.ts mcp` instead.
+`pi mcp add recallkeep -- bun /PATH/TO/recallkeep/src/cli.ts mcp` instead.
 
 ### Any other MCP client
 
 Cursor, Windsurf, Cline, VS Code and others can start the same server. Use command `bun` with arguments
-`/PATH/TO/ira-memory/src/cli.ts mcp`. They get the tools but no hooks, so paste
+`/PATH/TO/recallkeep/src/cli.ts mcp`. They get the tools but no hooks, so paste
 [`integrations/AGENTS.md`](integrations/AGENTS.md) into your agent instructions. It tells the agent to call
 `memory_context` at the start and to save decisions.
 
@@ -222,8 +222,8 @@ Cursor, Windsurf, Cline, VS Code and others can start the same server. Use comma
 `scripts/start.sh` waits for Docker, starts Postgres, applies migrations and runs the API. Service templates
 call it:
 
-- **macOS:** [`deploy/launchd/dev.ira-memory.plist`](deploy/launchd/dev.ira-memory.plist)
-- **Linux:** [`deploy/systemd/ira-memory.service`](deploy/systemd/ira-memory.service)
+- **macOS:** [`deploy/launchd/dev.recallkeep.plist`](deploy/launchd/dev.recallkeep.plist)
+- **Linux:** [`deploy/systemd/recallkeep.service`](deploy/systemd/recallkeep.service)
 
 Each file explains in its header how to install it. To update later, run `bun run update`. It pulls,
 installs, migrates and restarts the service.
@@ -258,17 +258,17 @@ Full details: [docs/how-it-works.md](docs/how-it-works.md).
 | **Recall** | Finding the facts most relevant to a question and ranking them. |
 | **Embedding** | A list of numbers that represents the meaning of a text. Texts with similar meanings get similar numbers. |
 | **pgvector** | The Postgres extension that stores embeddings and finds similar ones. |
-| **MCP** | Model Context Protocol, the standard way agents connect to tools. ira-memory runs as an MCP server over stdio. |
+| **MCP** | Model Context Protocol, the standard way agents connect to tools. RecallKeep runs as an MCP server over stdio. |
 | **Hook** | A command your agent runs at set moments, such as session start or prompt submit. |
 | **Tier** | How long a fact lives: `SHORT_TERM`, `DAILY` or `LONG_TERM`. |
 
 ## Security and privacy
 
-- The API listens on `127.0.0.1` only. To expose it on another address you must set `IRA_API_TOKEN`, and
+- The API listens on `127.0.0.1` only. To expose it on another address you must set `RECALLKEEP_API_TOKEN`, and
   clients then send `Authorization: Bearer <token>`.
 - Browser requests are rejected, so a web page you visit cannot read your memory. To allow a specific origin,
-  set `IRA_CORS_ORIGINS`.
-- Postgres is published on `127.0.0.1` only. Change `IRA_DB_PASSWORD` before the first `docker compose up` if
+  set `RECALLKEEP_CORS_ORIGINS`.
+- Postgres is published on `127.0.0.1` only. Change `RECALLKEEP_DB_PASSWORD` before the first `docker compose up` if
   other people use your machine.
 - Logged turns and pi transcripts are redacted before they are stored. Facts saved with `memory_save` are not
   redacted, so do not save secrets.
@@ -288,7 +288,7 @@ More: [docs/privacy.md](docs/privacy.md).
 | [Migration and updates](docs/migration.md) | Importing file-based memory, updating, backup and restore |
 | [Development](docs/development.md) | Repo layout, programmatic API, tests, CI |
 
-## Working on ira-memory
+## Working on RecallKeep
 
 ```bash
 bun install
@@ -300,11 +300,11 @@ To run the database tests and the API contract smoke test, create a throwaway da
 that holds your memory.
 
 ```bash
-docker compose exec ira-memory-db createdb -U ira_memory ira_memory_test
-export IRA_TEST_DATABASE_URL="postgresql://ira_memory:<password>@localhost:5433/ira_memory_test"
-MEMORY_DATABASE_URL="$IRA_TEST_DATABASE_URL" bunx prisma migrate deploy
+docker compose exec db createdb -U recallkeep recallkeep_test
+export RECALLKEEP_TEST_DATABASE_URL="postgresql://recallkeep:<password>@localhost:5433/recallkeep_test"
+RECALLKEEP_DATABASE_URL="$RECALLKEEP_TEST_DATABASE_URL" bunx prisma migrate deploy
 bun test
-SMOKE_DATABASE_URL="$IRA_TEST_DATABASE_URL" bun run smoke
+SMOKE_DATABASE_URL="$RECALLKEEP_TEST_DATABASE_URL" bun run smoke
 ```
 
 CI runs the same steps on every pull request. See [docs/development.md](docs/development.md).

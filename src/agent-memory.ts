@@ -14,9 +14,9 @@
 import { redactSecrets } from "./redact.js";
 import { deriveProjectSlug } from "./slug.js";
 
-export const BASE_URL = (process.env.IRA_URL ?? `http://127.0.0.1:${process.env.MEMORY_API_PORT ?? 7775}`).replace(/\/+$/, "");
-const TOKEN = process.env.IRA_API_TOKEN ?? "";
-const TIMEOUT_MS = Number(process.env.IRA_CLIENT_TIMEOUT_MS ?? 2000);
+export const BASE_URL = (process.env.RECALLKEEP_URL ?? `http://127.0.0.1:${process.env.RECALLKEEP_API_PORT ?? 7775}`).replace(/\/+$/, "");
+const TOKEN = process.env.RECALLKEEP_API_TOKEN ?? "";
+const TIMEOUT_MS = Number(process.env.RECALLKEEP_CLIENT_TIMEOUT_MS ?? 2000);
 
 export const GLOBAL_SLUG = "global";
 export const FACT_TYPES = ["user", "feedback", "project", "reference"] as const;
@@ -200,7 +200,7 @@ export function formatRules(facts: Fact[]): string {
       .map((f) => `- ${f.content.trim().replace(/^\[global\]\s*/, "")}`),
     RULES_CHAR_BUDGET,
   );
-  return lines.length ? `## Standing rules (ira-memory, every project)\n${lines.join("\n")}\n` : "";
+  return lines.length ? `## Standing rules (RecallKeep, every project)\n${lines.join("\n")}\n` : "";
 }
 
 /** Facts tagged "decision", newest first. */
@@ -242,7 +242,7 @@ export async function sessionContext(cwd: string | undefined): Promise<string> {
   const body = [formatRules(rules), formatDecisions(projectFacts), formatRecent(projectFacts)].filter(Boolean).join("\n");
   if (!body) return "";
   return (
-    `# ira-memory${project ? ` (project: ${project})` : ""}\n\n${body}\n` +
+    `# RecallKeep${project ? ` (project: ${project})` : ""}\n\n${body}\n` +
     `Use the memory_search tool before re-deciding anything, and memory_save to record decisions and findings.\n`
   );
 }
@@ -268,7 +268,7 @@ export async function promptContext(prompt: string, cwd: string | undefined): Pr
     .filter((f) => !isBookkeeping(f))
     .slice(0, PROMPT_RECALL_LIMIT)
     .map((f) => `- ${f.content.replace(/\s+/g, " ").trim().slice(0, PROMPT_RECALL_PREVIEW_CHARS)}`);
-  return lines.length ? `## Related memory (ira-memory)\n${lines.join("\n")}\n` : "";
+  return lines.length ? `## Related memory (RecallKeep)\n${lines.join("\n")}\n` : "";
 }
 
 // ─── Turn capture ───────────────────────────────────────────────

@@ -1,4 +1,4 @@
-// Decisions extraction — Phase 6 of pi-ira-memory-capture.md, and the
+// Decisions extraction — Phase 6 of pi-recallkeep-capture.md, and the
 // direct fix for the incident that started this whole project: an audit
 // agent flagged nine already-settled architecture decisions as "unresolved"
 // because nothing distinguished a LOCKED choice from an open question in
@@ -13,7 +13,7 @@ import { semanticSearch } from "./search.js";
 import { getClient, CHAT_MODEL } from "./llm.js";
 import type { ExtractDecisionsInput, ExtractDecisionsResult } from "./types.js";
 
-const openai = getClient(); // null when IRA_LLM_PROVIDER=none — extraction is skipped, not faked
+const openai = getClient(); // null when RECALLKEEP_LLM_PROVIDER=none — extraction is skipped, not faked
 
 // The prompt is the whole mechanism here — this is the part that has to
 // actually solve the incident, not just the schema. The failure mode was an
@@ -71,7 +71,7 @@ export async function extractDecisions(input: ExtractDecisionsInput): Promise<Ex
   // locked), and this extraction runs once at session close, not on every
   // turn — low frequency, high value, worth the extra tokens. Still capped;
   // an unbounded session is still a real cost/latency concern.
-  const MAX_DECISION_CONVO_CHARS = Number(process.env.IRA_DECISIONS_CONVO_CAP ?? 60_000);
+  const MAX_DECISION_CONVO_CHARS = Number(process.env.RECALLKEEP_DECISIONS_CONVO_CAP ?? 60_000);
   let convoText = "";
   for (const msg of messages) {
     const line = `[${msg.role}]: ${msg.content}\n`;

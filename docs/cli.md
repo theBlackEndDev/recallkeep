@@ -1,8 +1,8 @@
 # CLI reference
 
-This file is the reference for every `ira-memory` CLI command.
+This file is the reference for every `recallkeep` CLI command.
 
-This file lists every command of the `ira-memory` CLI. Run commands with:
+This file lists every command of the `recallkeep` CLI. Run commands with:
 
 ```bash
 bun run src/cli.ts <command> [options]
@@ -62,7 +62,7 @@ See [how-it-works.md](how-it-works.md#retrieval-strategy) for how `recall` ranks
 | `import` | Import from file-based memory (`MEMORY.md` and daily notes) | `import --memory-md /path/to/MEMORY.md --daily-dir /path/to/memory/` |
 | `export` | Export as JSON or markdown | `export --format md` or `export --format json` |
 | `backup` | Create a timestamped `pg_dump` | `backup` |
-| `restore` | Restore from a `pg_dump` file | `restore ./backups/ira-memory-2026-04-06.sql` |
+| `restore` | Restore from a `pg_dump` file | `restore ./backups/recallkeep-2026-04-06.sql` |
 | `backfill` | Generate embeddings for items that do not have one | `backfill --type facts --batch 50` |
 
 See [migration.md](migration.md) for how these commands fit into an upgrade or a move.
@@ -110,13 +110,13 @@ bun run src/cli.ts hook <claude|codex|agy> <session-start|prompt|stop>
 | `prompt` | Logs the user's prompt and injects facts related to it. |
 | `stop` | Logs the assistant's final reply for the turn. |
 
-The agent harness pipes its event JSON to stdin. Every failure is swallowed, so the hook exits `0` with no output when memory is down. This means an unreachable memory service never blocks an agent. Set `IRA_HOOK_DEBUG=1` to print errors to stderr.
+The agent harness pipes its event JSON to stdin. Every failure is swallowed, so the hook exits `0` with no output when memory is down. This means an unreachable memory service never blocks an agent. Set `RECALLKEEP_HOOK_DEBUG=1` to print errors to stderr.
 
 The `agy` harness has no prompt-submit event. It uses `PreInvocation` instead, which runs before every model call in a turn.
 
 ### The `mcp` command
 
-`mcp` starts a stdio MCP server named `ira-memory`. It is a thin layer over the HTTP API, so `IRA_URL` must point at a running server. The working directory for project scoping comes from `IRA_CWD`, or from the process's working directory if `IRA_CWD` is unset.
+`mcp` starts a stdio MCP server named `recallkeep`. It is a thin layer over the HTTP API, so `RECALLKEEP_URL` must point at a running server. The working directory for project scoping comes from `RECALLKEEP_CWD`, or from the process's working directory if `RECALLKEEP_CWD` is unset.
 
 The server registers these tools: `memory_search`, `memory_save`, `memory_context`, `memory_list`, and `memory_forget`.
 

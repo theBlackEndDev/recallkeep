@@ -22,4 +22,3 @@ serviceAccount*.json
 # --- end safety baseline ---
 
 # runtime event log
-.ira/

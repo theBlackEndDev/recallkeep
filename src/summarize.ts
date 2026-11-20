@@ -3,7 +3,7 @@ import { embedSummaryAsync } from "./embed.js";
 import { getClient, CHAT_MODEL } from "./llm.js";
 import type { Summary, SummaryScope } from "./types.js";
 
-// null when IRA_LLM_PROVIDER=none → summary functions fall back to extractive (no LLM) summaries.
+// null when RECALLKEEP_LLM_PROVIDER=none → summary functions fall back to extractive (no LLM) summaries.
 const openai = getClient();
 
 export interface SummarizeInput {
@@ -97,7 +97,7 @@ async function summarizeSession(sessionId: string) {
     convoText += line;
   }
 
-  // No LLM (IRA_LLM_PROVIDER=none) → extractive fallback: keep the (truncated) transcript as the
+  // No LLM (RECALLKEEP_LLM_PROVIDER=none) → extractive fallback: keep the (truncated) transcript as the
   // summary, no fact extraction. The raw turns remain fully searchable via FTS.
   if (!openai) {
     return {

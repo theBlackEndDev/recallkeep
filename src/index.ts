@@ -1,4 +1,4 @@
-// IRA Memory System - Public API
+// RecallKeep System - Public API
 
 // Store operations
 export {

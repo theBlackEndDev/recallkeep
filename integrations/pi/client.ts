@@ -1,5 +1,5 @@
 /**
- * Typed HTTP client for ira-memory.
+ * Typed HTTP client for recallkeep.
  *
  * Every function here fails open: a timeout, a network error, a non-2xx
  * response, or a malformed JSON body all resolve to `null` (or `[]` for the
@@ -11,14 +11,14 @@
  * Endpoint contract: `./API.md`.
  *
  * Naming note for callers: `listFacts` takes the *raw* project
- * slug (e.g. `"ira-memory"`), matching the server's `?project=` query param,
+ * slug (e.g. `"recallkeep"`), matching the server's `?project=` query param,
  * which it internally expands to the tag `project:<slug>`. `writeHandoff`
- * instead takes the *full* tag string (e.g. `"project:ira-memory"|"project:Projects"`)
+ * instead takes the *full* tag string (e.g. `"project:recallkeep"|"project:Projects"`)
  * as produced by `projectTagForCwd`, because it is written verbatim into the
  * fact's tags rather than through the server's project-resolution field.
  */
 
-const BASE_URL = (process.env.IRA_URL ?? "http://127.0.0.1:7775").replace(/\/+$/, "");
+const BASE_URL = (process.env.RECALLKEEP_URL ?? "http://127.0.0.1:7775").replace(/\/+$/, "");
 const TIMEOUT_MS = 800;
 /** Search calls are explicit tool calls: someone is waiting for the answer, and semantic recall embeds the query, so it takes about 0.5s warm. */
 const SEARCH_TIMEOUT_MS = 5000;
@@ -61,7 +61,7 @@ async function request<T>(
 ): Promise<T | null> {
 	try {
 		// Read per call so a token set after import (or in tests) is honoured.
-		const token = process.env.IRA_API_TOKEN;
+		const token = process.env.RECALLKEEP_API_TOKEN;
 		const res = await fetch(`${BASE_URL}${path}`, {
 			...init,
 			headers: token ? { ...(init.headers as Record<string, string>), Authorization: `Bearer ${token}` } : init.headers,
@@ -75,7 +75,7 @@ async function request<T>(
 }
 
 /**
- * Tell ira-memory to (re-)import a pi session's transcript from disk.
+ * Tell recallkeep to (re-)import a pi session's transcript from disk.
  * `POST /session/sync`. Carries a file path only, never message content —
  * the server reads `sessionFile` itself. Idempotent: safe to
  * call repeatedly against the same growing file.
@@ -100,7 +100,7 @@ export async function syncSession(
 
 /**
  * Store the session handoff as a fact tagged with both `projectTag`
- * (e.g. `"project:ira-memory"`) and `"pi:handoff"`. `POST /memory`.
+ * (e.g. `"project:recallkeep"`) and `"pi:handoff"`. `POST /memory`.
  * Returns `null` on any failure.
  */
 export async function writeHandoff(
@@ -251,7 +251,7 @@ export async function getMessage(id: string): Promise<Message | null> {
 }
 
 /**
- * Check whether the ira-memory service is up. `GET /health`.
+ * Check whether the recallkeep service is up. `GET /health`.
  * Returns `null` on any failure.
  */
 export async function health(): Promise<HealthResult | null> {

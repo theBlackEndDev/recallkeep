@@ -8,12 +8,12 @@
  *
  * This digest is now used ONLY to build the local `session_shutdown`
  * handoff (`handoff.ts`'s `buildHandoff` parses its "Label: value" format).
- * It is never sent to ira-memory. Assistant text is deliberately absent from
+ * It is never sent to recallkeep. Assistant text is deliberately absent from
  * it — it was never meant to carry the full turn, only enough of the user's
  * ask and the tool trail to reconstruct a "Worked on" / "Touched" summary at
- * quit time. The full turn (both roles, untruncated) reaches ira-memory a
+ * quit time. The full turn (both roles, untruncated) reaches recallkeep a
  * different way now: `index.ts`'s `agent_settled`/`session_shutdown` hooks
- * sync pi's own session *file* to `POST /session/sync`, and ira-memory reads
+ * sync pi's own session *file* to `POST /session/sync`, and recallkeep reads
  * the transcript itself. If you are looking for "where does the model's
  * answer get stored", it is not in this file — see `client.ts`'s
  * `syncSession`.

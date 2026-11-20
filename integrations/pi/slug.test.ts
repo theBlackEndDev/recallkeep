@@ -9,18 +9,18 @@ const check = (name: string, got: unknown, want: unknown) => {
 
 check(
   "nested path under a project collapses to the project root",
-  projectTagForCwd("/workspace/dev/Projects/ira-memory/src/db"),
-  "project:ira-memory",
+  projectTagForCwd("/workspace/dev/Projects/recallkeep/src/db"),
+  "project:recallkeep",
 );
 check(
   "project root itself (no trailing slash)",
-  projectTagForCwd("/workspace/dev/Projects/ira-memory"),
-  "project:ira-memory",
+  projectTagForCwd("/workspace/dev/Projects/recallkeep"),
+  "project:recallkeep",
 );
 check(
   "project root with trailing slash",
-  projectTagForCwd("/workspace/dev/Projects/ira-memory/"),
-  "project:ira-memory",
+  projectTagForCwd("/workspace/dev/Projects/recallkeep/"),
+  "project:recallkeep",
 );
 
 // --- the Projects root itself, with and without trailing slash ---
@@ -76,16 +76,16 @@ check(
 check("empty string returns null", projectTagForCwd(""), null);
 check("projectSlugForCwd empty string returns null", projectSlugForCwd(""), null);
 
-// --- parity contract with ira-memory's deriveProjectSlug ---
-// ira-memory (src/slug.ts) implements the identical three-rule algorithm
+// --- parity contract with recallkeep's deriveProjectSlug ---
+// recallkeep (src/slug.ts) implements the identical three-rule algorithm
 // server-side, for Claude Code + HTTP X-Cwd resolution. There is no shared
 // import between the two, so this fixture list is the parity contract:
 // if you change the algorithm here, change deriveProjectSlug in src/slug.ts
 // to match, and re-run both test files. (slugFromTag strips the "project:"
 // prefix this side adds that the server side does not.)
 const PARITY_FIXTURES: Array<[cwd: string, slug: string | null]> = [
-  ["/workspace/dev/Projects/ira-memory/src/db", "ira-memory"],
-  ["/workspace/dev/Projects/ira-memory", "ira-memory"],
+  ["/workspace/dev/Projects/recallkeep/src/db", "recallkeep"],
+  ["/workspace/dev/Projects/recallkeep", "recallkeep"],
   ["/workspace/dev/Projects", "Projects"],
   ["~/Projects/", "Projects"],
   ["/srv/projects/widget-api", "widget-api"],

@@ -1,6 +1,6 @@
-# pi integration for ira-memory
+# pi integration for RecallKeep
 
-A [pi](https://github.com/earendil-works/pi) extension that connects pi sessions to ira-memory.
+A [pi](https://github.com/earendil-works/pi) extension that connects pi sessions to recallkeep.
 It gives each session continuity across restarts and keeps a searchable copy of every
 conversation.
 
@@ -9,7 +9,7 @@ conversation.
 - **At session start** it shows, and injects into the system prompt: your standing rules
   (facts saved under project `global`), the project's locked decisions, recent facts, and the
   last session's handoff.
-- **After each turn** it asks ira-memory to import pi's own session file. The call is debounced
+- **After each turn** it asks RecallKeep to import pi's own session file. The call is debounced
   (10 seconds), so a burst of turns makes one request.
 - **On quit** it does one last sync and writes a short handoff (what was worked on, which files
   were touched, where you left off).
@@ -17,7 +17,7 @@ conversation.
   `memory_save` (store a fact).
 - **Commands for you:** `/memory` (status for the current folder) and `/handoff` (write the
   handoff now, without quitting).
-- **Fails open.** Every request has an 800ms timeout and never throws. If ira-memory is down,
+- **Fails open.** Every request has an 800ms timeout and never throws. If RecallKeep is down,
   the session runs as if the extension were not there. After 3 failed syncs in a row, it stops
   trying until the next session.
 
@@ -35,7 +35,7 @@ ln -s "$(pwd)/integrations/pi" ~/.pi/agent/extensions/memory
 ```
 
 Start pi, or run `/reload` in a running session. Run `/memory` to check that it can reach
-ira-memory.
+recallkeep.
 
 The extension imports `@earendil-works/pi-coding-agent`, `@earendil-works/pi-tui` and `typebox`.
 Pi provides these when it loads the extension, so you do not install them here.
@@ -44,8 +44,8 @@ Pi provides these when it loads the extension, so you do not install them here.
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `IRA_URL` | `http://127.0.0.1:7775` | Where ira-memory listens. A trailing slash is removed. |
-| `IRA_API_TOKEN` | unset | If set, sent as `Authorization: Bearer <token>` on every request. Use the same value as the server. |
+| `RECALLKEEP_URL` | `http://127.0.0.1:7775` | Where RecallKeep listens. A trailing slash is removed. |
+| `RECALLKEEP_API_TOKEN` | unset | If set, sent as `Authorization: Bearer <token>` on every request. Use the same value as the server. |
 
 Set them in the shell that starts pi.
 
@@ -54,7 +54,7 @@ Set them in the shell that starts pi.
 The extension sends only a file path. The server reads the file itself, and only if it is
 inside pi's sessions directory. The server picks that directory from, in order:
 
-1. `IRA_PI_SESSIONS_DIR`
+1. `RECALLKEEP_PI_SESSIONS_DIR`
 2. `PI_CODING_AGENT_SESSION_DIR`
 3. `$PI_CODING_AGENT_DIR/sessions`
 4. `~/.pi/agent/sessions`
@@ -68,13 +68,13 @@ The tag comes from the session's working directory (`slug.ts`):
 
 | cwd | tag |
 |---|---|
-| `~/Projects/ira-memory` (any depth below it) | `project:ira-memory` |
+| `~/Projects/recallkeep` (any depth below it) | `project:recallkeep` |
 | `~/Projects` itself (with or without trailing slash) | `project:Projects` (deliberate catch-all, not a bug) |
 | anywhere else, e.g. `~/work/notes` | `project:notes` (basename fallback) |
 | empty cwd only | `null`, nothing is recorded |
 
-Nested paths collapse to the project root, so `~/Projects/ira-memory/src/db` is
-`project:ira-memory`. The rules must match the server's `deriveProjectSlug` in
+Nested paths collapse to the project root, so `~/Projects/recallkeep/src/db` is
+`project:recallkeep`. The rules must match the server's `deriveProjectSlug` in
 `../../src/slug.ts`. Both sides test the same fixtures.
 
 ## Two storage tracks
@@ -83,7 +83,7 @@ The transcript and the handoff go to different endpoints on purpose. They fail i
 ways and have different readers.
 
 1. **Full transcript → messages table.** `POST /session/sync` carries
-   `{sessionFile, sessionId, cwd, final}`: a path, never message content. ira-memory reads
+   `{sessionFile, sessionId, cwd, final}`: a path, never message content. RecallKeep reads
    pi's session file and stores user and assistant text, tool calls and tool results. Secrets
    are redacted before storage. Syncing the same file again only imports new entries. The final
    sync on quit also runs summarization and decision extraction on the server.

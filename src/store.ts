@@ -56,8 +56,8 @@ export async function closeSession(
     }
   }
 
-  // Extract learnings from the session (opt-out via IRA_AUTO_LEARN=false)
-  if (runLearn && process.env.IRA_AUTO_LEARN !== "false") {
+  // Extract learnings from the session (opt-out via RECALLKEEP_AUTO_LEARN=false)
+  if (runLearn && process.env.RECALLKEEP_AUTO_LEARN !== "false") {
     try {
       const msgCount = await prisma.message.count({ where: { sessionId } });
       if (msgCount >= 3) {

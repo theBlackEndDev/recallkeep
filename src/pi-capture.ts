@@ -1,9 +1,9 @@
 #!/usr/bin/env bun
 /**
- * pi-capture.ts — imports a pi session's JSONL transcript into ira-memory.
+ * pi-capture.ts — imports a pi session's JSONL transcript into recallkeep.
  *
  * Sibling to cc-capture.ts, same spine (parse → extract → dedup → store),
- * different source format. See ~/Projects/Plans/pi-ira-memory-capture.md for
+ * different source format. See ~/Projects/Plans/pi-recallkeep-capture.md for
  * the design (§3.2A) and the phase this belongs to (Phase 1).
  *
  * Unlike cc-capture.ts (a one-shot SessionEnd hook fed a finished transcript),
@@ -20,7 +20,7 @@
  *     toolName/toolInput set, content is a short capped marker
  *     (`→ name(args)`) so it's still FTS-searchable without being prose.
  *   - a toolResult session entry → role="tool", toolName/toolOutput set,
- *     content is the result text head-capped at IRA_PI_TOOLRESULT_CAP
+ *     content is the result text head-capped at RECALLKEEP_PI_TOOLRESULT_CAP
  *     (default 2000 chars; p50 tool-result size in this codebase's own
  *     transcripts was 416 chars, so most results are stored in full).
  * Both are always `skipEmbed: true` (plan: "tool results never embedded" —
@@ -48,10 +48,10 @@ import { redactBatch } from "./redact.js";
 /**
  * Only files under here may be imported — the sync endpoint reads whatever path it's given.
  * Follows pi's own overrides: PI_CODING_AGENT_SESSION_DIR, then PI_CODING_AGENT_DIR/sessions,
- * then ~/.pi/agent/sessions. IRA_PI_SESSIONS_DIR wins over all of them.
+ * then ~/.pi/agent/sessions. RECALLKEEP_PI_SESSIONS_DIR wins over all of them.
  */
 export const SESSIONS_ROOT = resolve(
-  process.env.IRA_PI_SESSIONS_DIR ??
+  process.env.RECALLKEEP_PI_SESSIONS_DIR ??
     process.env.PI_CODING_AGENT_SESSION_DIR ??
     join(process.env.PI_CODING_AGENT_DIR ?? join(homedir(), ".pi", "agent"), "sessions"),
 );
@@ -112,7 +112,7 @@ export interface PiCaptureInput {
   sessionId?: string;
   /** Hint only — the session header's own `cwd` is authoritative when present. */
   cwd?: string;
-  /** True on session_shutdown: marks the ira-memory session ended. */
+  /** True on session_shutdown: marks the RecallKeep session ended. */
   final?: boolean;
 }
 
@@ -124,11 +124,11 @@ export interface PiCaptureResult {
   project: string | null;
 }
 
-const MAX_MESSAGE_CHARS = Number(process.env.IRA_PI_MESSAGE_CAP ?? 50_000);
+const MAX_MESSAGE_CHARS = Number(process.env.RECALLKEEP_PI_MESSAGE_CAP ?? 50_000);
 /** Shared cap for tool RESULT content and tool CALL arguments (plan Phase 4).
  * p50 tool-result size measured across this codebase's own sessions was 416
  * chars, so the default keeps most results whole while bounding the tail. */
-const MAX_TOOLRESULT_CHARS = Number(process.env.IRA_PI_TOOLRESULT_CAP ?? 2_000);
+const MAX_TOOLRESULT_CHARS = Number(process.env.RECALLKEEP_PI_TOOLRESULT_CAP ?? 2_000);
 
 /** Exported so http-server.ts can reject disallowed paths before doing any work. */
 export function isSessionFileAllowed(path: string): boolean {
@@ -226,7 +226,7 @@ function onLeafPath(entries: FileEntry[]): Set<string> {
 }
 
 /**
- * Import whatever is new in `sessionFile` into ira-memory. Safe to call
+ * Import whatever is new in `sessionFile` into recallkeep. Safe to call
  * repeatedly against the same growing file.
  */
 export async function importPiSession(input: PiCaptureInput): Promise<PiCaptureResult> {
@@ -245,7 +245,7 @@ export async function importPiSession(input: PiCaptureInput): Promise<PiCaptureR
   const project = deriveProjectSlug(cwd);
   const onPath = onLeafPath(entries);
 
-  // Find-or-create the ira-memory session row for this pi session.
+  // Find-or-create the recallkeep session row for this pi session.
   let sessionRow = await prisma.session.findFirst({
     where: { metadata: { path: ["piSessionId"], equals: piSessionId } },
   });
@@ -405,7 +405,7 @@ export async function importPiSession(input: PiCaptureInput): Promise<PiCaptureR
     // Unlike cc-capture.ts, this DOES run summarize (Phase 5). cc-capture
     // skips it because it's a short-lived hook subprocess Claude Code kills
     // before a 5-10s OpenAI summarization call can finish; pi-capture runs
-    // inside ira-memory's own long-lived HTTP server process, so that kill
+    // inside recallkeep's own long-lived HTTP server process, so that kill
     // risk doesn't apply. `learn` (fact extraction) stays off — that's
     // Phase 6's decisions-extraction pass, a different prompt/purpose than
     // generic session summarization.

@@ -7,7 +7,7 @@ import { semanticSearch } from "./search.js";
 import { getClient, CHAT_MODEL } from "./llm.js";
 import type { DiscoverInput, DiscoverResult, DiscoverAspect, LearningType, MemoryCategory } from "./types.js";
 
-const openai = getClient(); // null when IRA_LLM_PROVIDER=none → discovery produces no facts
+const openai = getClient(); // null when RECALLKEEP_LLM_PROVIDER=none → discovery produces no facts
 
 const DEFAULT_INCLUDE_EXTS = new Set([
   ".ts", ".tsx", ".js", ".jsx", ".json", ".yaml", ".yml", ".md",

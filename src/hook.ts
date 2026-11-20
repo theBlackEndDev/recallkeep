@@ -1,7 +1,7 @@
 /**
  * Lifecycle hooks for coding agents. One command, three harnesses:
  *
- *   bun /path/to/ira-memory/src/cli.ts hook <claude|codex|agy> <session-start|prompt|stop>
+ *   bun /path/to/recallkeep/src/cli.ts hook <claude|codex|agy> <session-start|prompt|stop>
  *
  *   session-start  inject standing rules, locked decisions and recent facts
  *   prompt         log the user's prompt and inject facts related to it
@@ -85,7 +85,7 @@ export function injection(harness: Harness, event: Event, text: string): string 
 // agy fires PreInvocation before every model call in a turn, and an
 // ephemeralMessage lasts one call. Recall and logging run once per turn
 // (invocationNum 0); later calls in the turn reuse the cached result.
-const STATE_DIR = join(process.env.IRA_DATA_DIR ?? join(homedir(), ".ira-memory"), "hook-state");
+const STATE_DIR = join(process.env.RECALLKEEP_DATA_DIR ?? join(homedir(), ".recallkeep"), "hook-state");
 const stateFile = (id: string) => join(STATE_DIR, `agy-${id.replace(/[^\w.-]/g, "_")}.txt`);
 
 async function run(harness: Harness, event: Event, input: Input): Promise<string> {
@@ -131,6 +131,6 @@ export async function runHook(args: string[]): Promise<void> {
     const out = await run(harness, event, normalize(harness, raw));
     if (out) process.stdout.write(out + "\n");
   } catch (e) {
-    if (process.env.IRA_HOOK_DEBUG) console.error("[ira-memory hook]", e);
+    if (process.env.RECALLKEEP_HOOK_DEBUG) console.error("[recallkeep hook]", e);
   }
 }

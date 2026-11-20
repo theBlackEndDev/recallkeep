@@ -1,12 +1,12 @@
 #!/usr/bin/env bun
 /**
- * update.ts — bring an installed ira-memory up to date: pull, deps, migrate, restart, health-check.
+ * update.ts — bring an installed recallkeep up to date: pull, deps, migrate, restart, health-check.
  *
  *   bun run update            # or: bun run scripts/update.ts
  *   bun run update -- --dry-run
  *
- * Best-effort + idempotent. Restarts the managed service (IRA_SERVICE_NAME, else the deploy/
- * template names, else the older ira-memory-api names); prints a hint if no unit is found.
+ * Best-effort + idempotent. Restarts the managed service (RECALLKEEP_SERVICE_NAME, else the deploy/
+ * template names); prints a hint if no unit is found.
  */
 import { spawnSync, type SpawnSyncReturns } from 'node:child_process';
 import { resolve } from 'node:path';
@@ -16,7 +16,7 @@ const REPO = resolve(import.meta.dir, '..');
 const OS: 'darwin' | 'linux' | 'other' =
   process.platform === 'darwin' ? 'darwin' : process.platform === 'linux' ? 'linux' : 'other';
 const DRY = process.argv.includes('--dry-run');
-const PORT = Number(process.env.MEMORY_API_PORT ?? 7775);
+const PORT = Number(process.env.RECALLKEEP_API_PORT ?? 7775);
 
 const log = (tag: string, msg: string) => console.log(`  ${DRY ? '[dry] ' : ''}${tag.padEnd(9)} ${msg}`);
 const die = (msg: string): never => { console.error(`\n✗ ${msg}`); process.exit(1); };
@@ -28,7 +28,7 @@ function run(cmd: string, args: string[]): SpawnSyncReturns<string> {
 const cap = (cmd: string, args: string[]) =>
   (spawnSync(cmd, args, { cwd: REPO, encoding: 'utf-8' }).stdout || '').trim();
 
-console.log(`\n=== ira-memory update (${OS}${DRY ? ', dry-run' : ''}) ===`);
+console.log(`\n=== recallkeep update (${OS}${DRY ? ', dry-run' : ''}) ===`);
 log('REPO', REPO);
 
 // Dirty tracked files block a fast-forward pull.
@@ -47,15 +47,15 @@ const mig = run('bunx', ['prisma', 'migrate', 'deploy']);
 log('DB', mig.status === 0 ? 'prisma migrate deploy' : `⚠️ migrate exited ${mig.status} — is the DB up? (docker compose up -d)`);
 
 // Restart the managed service so it picks up the new code + .env.
-// Unit names: IRA_SERVICE_NAME first, then the deploy/ templates, then the older names.
-const units = [process.env.IRA_SERVICE_NAME, ...(OS === 'darwin' ? ['dev.ira-memory', 'com.ira.ira-memory-api'] : ['ira-memory.service', 'ira-memory-api.service'])].filter(Boolean) as string[];
+// Unit names: RECALLKEEP_SERVICE_NAME first, then the deploy/ templates.
+const units = [process.env.RECALLKEEP_SERVICE_NAME, ...(OS === 'darwin' ? ['dev.recallkeep'] : ['recallkeep.service'])].filter(Boolean) as string[];
 const restartUnit = (u: string) =>
   OS === 'darwin'
     ? spawnSync('launchctl', ['kickstart', '-k', `gui/${userInfo().uid}/${u}`], { encoding: 'utf-8' }).status === 0
     : spawnSync('systemctl', ['--user', 'restart', u], { encoding: 'utf-8' }).status === 0;
 const restarted = DRY ? units[0] : units.find(restartUnit);
 if (restarted) log('RESTART', `${restarted}${DRY ? ' (dry run)' : ''}`);
-else log('RESTART', '⚠️ no managed unit found — set IRA_SERVICE_NAME or restart the memory API manually (bun run memory-api)');
+else log('RESTART', '⚠️ no managed unit found — set RECALLKEEP_SERVICE_NAME or restart the memory API manually (bun run memory-api)');
 
 // Health check (best-effort; /health doesn't touch the DB, so also try a DB-backed endpoint).
 if (!DRY) {
@@ -63,4 +63,4 @@ if (!DRY) {
   const ok = /"?status"?\s*:?\s*"?ok/i.test(probe('/health').stdout || '');
   log('HEALTH', ok ? '✓ up' : '⚠️ no response yet — it may still be starting (re-check in a few seconds)');
 }
-console.log(`\n✓ ira-memory updated.${DRY ? ' (dry-run — nothing changed)' : ''}\n`);
+console.log(`\n✓ recallkeep updated.${DRY ? ' (dry-run — nothing changed)' : ''}\n`);

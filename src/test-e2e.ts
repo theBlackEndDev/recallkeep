@@ -36,7 +36,7 @@ function assert(condition: boolean, name: string) {
 }
 
 async function test() {
-  console.log("=== IRA Memory E2E Test Suite ===\n");
+  console.log("=== RecallKeep E2E Test Suite ===\n");
 
   // ─── Phase 1: Core CRUD ───────────────────────────────────────
   console.log("Phase 1: Core Operations");
@@ -150,7 +150,7 @@ async function test() {
 
   const mdExport = await exportMarkdown();
   assert(!mdExport.includes("REDACTED-FIXTURE-7"), "exportMarkdown excludes sensitive facts");
-  assert(mdExport.includes("# IRA Memory Export"), "exportMarkdown has header");
+  assert(mdExport.includes("# RecallKeep Export"), "exportMarkdown has header");
 
   const jsonExport = await exportAll();
   assert(jsonExport.stats.facts > 0, "exportAll includes fact count");

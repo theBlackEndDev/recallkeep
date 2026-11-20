@@ -1,12 +1,12 @@
 # Privacy and security
 
-This file explains what ira-memory stores, what it redacts, what it exposes, and how to clean up sensitive data.
+This file explains what RecallKeep stores, what it redacts, what it exposes, and how to clean up sensitive data.
 
-This file explains what ira-memory stores, what it redacts before storing, what it refuses to expose, and how to check and clean up sensitive data. Read it before you expose the API beyond your own machine.
+This file explains what RecallKeep stores, what it redacts before storing, what it refuses to expose, and how to check and clean up sensitive data. Read it before you expose the API beyond your own machine.
 
 ## The privacy model
 
-ira-memory is single-user. Every channel (CLI, pi, Claude Code, Codex, Antigravity, and any HTTP client) shares one memory pool. There are no per-channel access rules.
+RecallKeep is single-user. Every channel (CLI, pi, Claude Code, Codex, Antigravity, and any HTTP client) shares one memory pool. There are no per-channel access rules.
 
 - `session.channel` is metadata for filtering. It is not an access boundary.
 - Anything that can reach the HTTP API can read and write all memory. Protect the API accordingly (see [Network exposure](#network-exposure)).
@@ -98,10 +98,10 @@ The HTTP API has no login by default, so its bind address and token are the only
 
 | Setting | Default | Effect |
 |---------|---------|--------|
-| `MEMORY_API_HOST` | `127.0.0.1` | Listens on loopback only. |
-| `IRA_API_TOKEN` | unset | When set, every route except `/health` requires `Authorization: Bearer <token>`. Comparison is constant-time. |
-| `MEMORY_API_HOST` set to a non-loopback address | refused | The server exits at startup unless `IRA_API_TOKEN` is set. |
-| `IRA_CORS_ORIGINS` | empty | No browser origin may call the API. A web page you visit cannot read or write memory. |
+| `RECALLKEEP_API_HOST` | `127.0.0.1` | Listens on loopback only. |
+| `RECALLKEEP_API_TOKEN` | unset | When set, every route except `/health` requires `Authorization: Bearer <token>`. Comparison is constant-time. |
+| `RECALLKEEP_API_HOST` set to a non-loopback address | refused | The server exits at startup unless `RECALLKEEP_API_TOKEN` is set. |
+| `RECALLKEEP_CORS_ORIGINS` | empty | No browser origin may call the API. A web page you visit cannot read or write memory. |
 
 Other protections:
 
@@ -111,7 +111,7 @@ Other protections:
 
 ### Postgres
 
-The database container publishes its port on loopback only: `127.0.0.1` and `[::1]`, on `IRA_DB_PORT` (default `5433`). The default password in `docker-compose.yml` is public. Never publish the database port to a LAN address. Set `IRA_DB_PASSWORD` to a strong value before the first `docker compose up`.
+The database container publishes its port on loopback only: `127.0.0.1` and `[::1]`, on `RECALLKEEP_DB_PORT` (default `5433`). The default password in `docker-compose.yml` is public. Never publish the database port to a LAN address. Set `RECALLKEEP_DB_PASSWORD` to a strong value before the first `docker compose up`.
 
 ### Session file reads
 

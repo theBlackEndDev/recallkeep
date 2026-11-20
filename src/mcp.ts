@@ -2,9 +2,9 @@
  * MCP server over stdio. Any MCP client (Claude Code, Codex CLI, Antigravity
  * CLI, pi, Cursor, ...) starts it as a child process:
  *
- *   bun /path/to/ira-memory/src/cli.ts mcp
+ *   bun /path/to/recallkeep/src/cli.ts mcp
  *
- * It is a thin layer over the HTTP API (IRA_URL, default http://127.0.0.1:7775),
+ * It is a thin layer over the HTTP API (RECALLKEEP_URL, default http://127.0.0.1:7775),
  * so the API server must be running. The project defaults to the one derived
  * from the directory the client started the server in.
  */
@@ -26,18 +26,18 @@ import {
 } from "./agent-memory.js";
 
 const text = (t: string) => ({ content: [{ type: "text" as const, text: t }] });
-const cwd = () => process.env.IRA_CWD ?? process.cwd();
-const DOWN = `ira-memory is not reachable at ${BASE_URL}. Start it with \`bun run memory-api\`.`;
+const cwd = () => process.env.RECALLKEEP_CWD ?? process.cwd();
+const DOWN = `RecallKeep is not reachable at ${BASE_URL}. Start it with \`bun run memory-api\`.`;
 
 export async function runMcpServer(): Promise<void> {
   const { version } = await Bun.file(new URL("../package.json", import.meta.url)).json();
-  const server = new McpServer({ name: "ira-memory", version });
+  const server = new McpServer({ name: "recallkeep", version });
 
   server.registerTool(
     "memory_search",
     {
       description: [
-        "Search ira-memory: curated facts and full prior session history (user and assistant turns, tool activity).",
+        "Search RecallKeep: curated facts and full prior session history (user and assistant turns, tool activity).",
         "Use it before asking the user to repeat something or re-deciding something an earlier session settled.",
         'Defaults to the current project. Pass project:"all" to search every project, or another slug.',
         "History results are truncated previews: pass expandId (from a result's [id=...]) to read one in full.",
@@ -57,7 +57,7 @@ export async function runMcpServer(): Promise<void> {
     "memory_save",
     {
       description: [
-        "Save a curated fact to ira-memory so later sessions know it: decisions, the user's rules and preferences,",
+        "Save a curated fact to RecallKeep so later sessions know it: decisions, the user's rules and preferences,",
         "findings, what was verified and how, status, open questions. One idea per fact, self-contained, dated, with the why.",
         'Defaults to the current project. project:"global" saves a standing rule shown at the start of every session.',
         'Add the tag "decision" to a settled decision so it is shown at the start of this project\'s sessions.',
@@ -122,5 +122,5 @@ export async function runMcpServer(): Promise<void> {
 
   await server.connect(new StdioServerTransport());
   // Warn once on stderr (never stdout: that is the protocol channel) if the API is down.
-  if (!(await request("/health"))) console.error(`[ira-memory mcp] ${DOWN}`);
+  if (!(await request("/health"))) console.error(`[recallkeep mcp] ${DOWN}`);
 }

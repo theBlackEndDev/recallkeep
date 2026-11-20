@@ -84,7 +84,7 @@ async function main() {
 
 function printUsage() {
   console.log(`
-IRA Memory CLI
+RecallKeep CLI
 
 Usage: bun run src/cli.ts <command> [options]
 
@@ -364,7 +364,7 @@ async function cmdStats() {
     prisma.$queryRaw<[{count: bigint}]>`SELECT COUNT(*) as count FROM message_embeddings`,
   ]);
 
-  console.log(`\nIRA Memory Stats:\n`);
+  console.log(`\nRecallKeep Stats:\n`);
   console.log(`  Sessions:        ${sessionCount}`);
   console.log(`  Messages:        ${messageCount}`);
   console.log(`  Active Facts:    ${factCount}`);
@@ -932,11 +932,11 @@ async function cmdInstallHooks() {
   // silently fails with command-not-found and the hook never captures.
   //
   // Precedence:
-  //   1. IRA_BUN_PATH env var (explicit override for non-default installs:
+  //   1. RECALLKEEP_BUN_PATH env var (explicit override for non-default installs:
   //      nvm, asdf, pnpm, nix, custom prefix, etc.)
   //   2. `command -v bun` on the current PATH
   //   3. ~/.bun/bin/bun (default installer location)
-  let bunPath = process.env.IRA_BUN_PATH ?? "";
+  let bunPath = process.env.RECALLKEEP_BUN_PATH ?? "";
   if (!bunPath) {
     try {
       bunPath = execSync("command -v bun", { encoding: "utf-8" }).trim();
@@ -950,7 +950,7 @@ async function cmdInstallHooks() {
   }
   if (!bunPath) {
     console.error(
-      "install-hooks: could not find `bun`. Set IRA_BUN_PATH to the absolute path of your bun binary and re-run."
+      "install-hooks: could not find `bun`. Set RECALLKEEP_BUN_PATH to the absolute path of your bun binary and re-run."
     );
     process.exit(1);
   }
@@ -992,7 +992,7 @@ async function cmdInstallHooks() {
   console.log("Claude Code session capture hook installed!\n");
   console.log(`  Settings: ${settingsPath}`);
   console.log(`  Hook:     SessionEnd -> ${hookCommand}`);
-  console.log(`\nEvery Claude Code session will now be captured to ira-memory.`);
+  console.log(`\nEvery Claude Code session will now be captured to recallkeep.`);
   console.log(`Run 'bun run src/cli.ts stats' after a session to verify.`);
 }
 

@@ -127,7 +127,7 @@ export async function exportMarkdown(): Promise<string> {
   }
 
   const lines: string[] = [
-    "# IRA Memory Export",
+    "# RecallKeep Export",
     `_Exported: ${new Date().toISOString()}_`,
     `_Active facts: ${facts.length}_`,
     "",
@@ -177,34 +177,34 @@ function formatCategoryName(cat: string): string {
 // ─── Backup / Restore ───────────────────────────────────────────
 
 // Resolve backups/ relative to this source file so there's no machine-
-// specific path baked in. Override with IRA_BACKUP_DIR if needed.
+// specific path baked in. Override with RECALLKEEP_BACKUP_DIR if needed.
 const BACKUP_DIR =
-  process.env.IRA_BACKUP_DIR ??
+  process.env.RECALLKEEP_BACKUP_DIR ??
   resolve(dirname(fileURLToPath(import.meta.url)), "..", "backups");
 
-// How to reach pg_dump/psql. IRA_DB_CONTAINER names a running container to
+// How to reach pg_dump/psql. RECALLKEEP_DB_CONTAINER names a running container to
 // `docker exec` into. Otherwise this repo's docker-compose service is used,
 // whatever compose named the container.
 const PROJECT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 function dbExec(cmd: string, interactive = false): string {
   const i = interactive ? "-i " : "";
-  const container = process.env.IRA_DB_CONTAINER;
+  const container = process.env.RECALLKEEP_DB_CONTAINER;
   if (container) return `docker exec ${i}${container} ${cmd}`;
-  return `docker compose -f "${join(PROJECT_ROOT, "docker-compose.yml")}" exec -T ira-memory-db ${cmd}`;
+  return `docker compose -f "${join(PROJECT_ROOT, "docker-compose.yml")}" exec -T db ${cmd}`;
 }
 
 /**
- * Create a pg_dump backup of the ira_memory database.
+ * Create a pg_dump backup of the recallkeep database.
  */
 export async function backup(): Promise<string> {
   await mkdir(BACKUP_DIR, { recursive: true });
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const filename = `ira-memory-${timestamp}.sql`;
+  const filename = `recallkeep-${timestamp}.sql`;
   const filepath = join(BACKUP_DIR, filename);
 
   execSync(
-    `${dbExec("pg_dump -U ira_memory -d ira_memory")} > "${filepath}"`,
+    `${dbExec("pg_dump -U recallkeep -d recallkeep")} > "${filepath}"`,
     { stdio: "pipe" }
   );
 
@@ -216,7 +216,7 @@ export async function backup(): Promise<string> {
  */
 export async function restore(filepath: string): Promise<void> {
   execSync(
-    `cat "${filepath}" | ${dbExec("psql -U ira_memory -d ira_memory", true)}`,
+    `cat "${filepath}" | ${dbExec("psql -U recallkeep -d recallkeep", true)}`,
     { stdio: "pipe" }
   );
 }

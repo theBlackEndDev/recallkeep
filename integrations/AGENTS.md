@@ -1,7 +1,7 @@
 <!-- Paste into your AGENTS.md, CLAUDE.md or GEMINI.md so the agent knows when to use memory. -->
-## Memory (ira-memory)
+## Memory (RecallKeep)
 
-ira-memory is the long-term memory for this project. Its tools are available through MCP.
+RecallKeep is the long-term memory for this project. Its tools are available through MCP.
 
 - Before you start work, and before you ask the user something they may have answered before,
   call `memory_search`. If no hook gave you context at session start, call `memory_context` first.

@@ -59,7 +59,7 @@ test("extractMessages redacts secret-shaped values in user and assistant message
 
 test("extractMessages passes ordinary text through unchanged", async () => {
   const userText = "How do we run the migration tests locally?";
-  const assistantText = "Run bun test with IRA_TEST_DATABASE_URL pointed at ira_memory_test.";
+  const assistantText = "Run bun test with RECALLKEEP_TEST_DATABASE_URL pointed at recallkeep_test.";
   const transcript = [
     JSON.stringify({
       type: "user",

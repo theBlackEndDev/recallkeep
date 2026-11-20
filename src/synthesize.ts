@@ -3,7 +3,7 @@ import { store } from "./store.js";
 import { getClient, CHAT_MODEL } from "./llm.js";
 import type { SynthesizeInput, SynthesizeResult, LearningType } from "./types.js";
 
-const openai = getClient(); // null when IRA_LLM_PROVIDER=none → synthesis is unavailable
+const openai = getClient(); // null when RECALLKEEP_LLM_PROVIDER=none → synthesis is unavailable
 
 const SYSTEM_PROMPT = `You are a knowledge synthesis engine. Given a question and relevant knowledge from a memory database, produce a comprehensive answer.
 
@@ -72,7 +72,7 @@ export async function synthesize(input: SynthesizeInput): Promise<SynthesizeResu
   if (!openai) {
     return {
       question: input.question,
-      synthesis: "Synthesis unavailable — no LLM provider configured (IRA_LLM_PROVIDER=none).",
+      synthesis: "Synthesis unavailable — no LLM provider configured (RECALLKEEP_LLM_PROVIDER=none).",
       sourceFacts: facts.map((f) => ({ id: f.id, content: f.content, score: f.score })),
       sourceSummaries: recalled.summaries.map((s) => ({ id: s.id, content: s.content, score: s.score })),
       confidence: 0,

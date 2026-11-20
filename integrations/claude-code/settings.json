@@ -1,13 +1,13 @@
 {
   "hooks": {
     "SessionStart": [
-      { "hooks": [{ "type": "command", "command": "bun /PATH/TO/ira-memory/src/cli.ts hook claude session-start", "timeout": 10 }] }
+      { "hooks": [{ "type": "command", "command": "bun /PATH/TO/recallkeep/src/cli.ts hook claude session-start", "timeout": 10 }] }
     ],
     "UserPromptSubmit": [
-      { "hooks": [{ "type": "command", "command": "bun /PATH/TO/ira-memory/src/cli.ts hook claude prompt", "timeout": 10 }] }
+      { "hooks": [{ "type": "command", "command": "bun /PATH/TO/recallkeep/src/cli.ts hook claude prompt", "timeout": 10 }] }
     ],
     "Stop": [
-      { "hooks": [{ "type": "command", "command": "bun /PATH/TO/ira-memory/src/cli.ts hook claude stop", "timeout": 10 }] }
+      { "hooks": [{ "type": "command", "command": "bun /PATH/TO/recallkeep/src/cli.ts hook claude stop", "timeout": 10 }] }
     ]
   }
 }

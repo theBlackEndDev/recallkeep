@@ -3,7 +3,7 @@
  *
  * A session's memory is tagged by the project folder it started in, so recall
  * for one project never surfaces another's history. This mirrors
- * ira-memory's own `deriveProjectSlug` (`../../src/slug.ts`) byte-for-byte —
+ * recallkeep's own `deriveProjectSlug` (`../../src/slug.ts`) byte-for-byte —
  * `slug.test.ts` includes a parity fixture list that both sides must agree on.
  *
  * Three rules, in order:
@@ -20,7 +20,7 @@
  *     point of this rule.
  */
 
-/** Slug only, no `project:` prefix. Shared logic with ira-memory's deriveProjectSlug. */
+/** Slug only, no `project:` prefix. Shared logic with RecallKeep's deriveProjectSlug. */
 export function projectSlugForCwd(cwd: string): string | null {
 	if (!cwd) return null;
 	const trimmed = cwd.replace(/\/+$/, "");

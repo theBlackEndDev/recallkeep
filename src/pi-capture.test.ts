@@ -3,13 +3,13 @@
 // idempotent re-import. Requires a live Postgres (uses the real store), same
 // as test-e2e.ts — not a pure-function test like slug.test.ts.
 //
-// DB isolation: only runs when IRA_TEST_DATABASE_URL points at a throwaway,
+// DB isolation: only runs when RECALLKEEP_TEST_DATABASE_URL points at a throwaway,
 // already-migrated database. Bun auto-loads .env, so the real
-// MEMORY_DATABASE_URL is always present in the environment — it is
+// RECALLKEEP_DATABASE_URL is always present in the environment — it is
 // overwritten below BEFORE anything that loads the Prisma client is imported
 // (hence the dynamic imports). The session fixture lives in a temp dir
-// (IRA_PI_SESSIONS_DIR, read by pi-capture.ts at module load), never in the
-// real ~/.pi/agent/sessions. Embeddings are disabled (IRA_LLM_PROVIDER=none);
+// (RECALLKEEP_PI_SESSIONS_DIR, read by pi-capture.ts at module load), never in the
+// real ~/.pi/agent/sessions. Embeddings are disabled (RECALLKEEP_LLM_PROVIDER=none);
 // nothing here needs them — the "tool rows are never embedded" check holds
 // trivially with embeddings off and is covered by the code path, not the API.
 
@@ -18,12 +18,12 @@ import { writeFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const TEST_DB_URL = process.env.IRA_TEST_DATABASE_URL;
+const TEST_DB_URL = process.env.RECALLKEEP_TEST_DATABASE_URL;
 if (TEST_DB_URL) {
-  process.env.MEMORY_DATABASE_URL = TEST_DB_URL;
-  process.env.IRA_LLM_PROVIDER = "none";
+  process.env.RECALLKEEP_DATABASE_URL = TEST_DB_URL;
+  process.env.RECALLKEEP_LLM_PROVIDER = "none";
 } else {
-  delete process.env.MEMORY_DATABASE_URL;
+  delete process.env.RECALLKEEP_DATABASE_URL;
 }
 
 function buildFixture(sessionId: string) {
@@ -40,7 +40,7 @@ function buildFixture(sessionId: string) {
   //           -> a3(assistant, has its own secret) [LEAF]
   const OVERSIZED_RESULT = "line of tool output ".repeat(150); // ~3000 chars, > MAX_TOOLRESULT_CHARS (2000)
   const lines = [
-    JSON.stringify({ type: "session", version: 3, id: sessionId, timestamp: "2026-01-01T00:00:00.000Z", cwd: "/home/dev/Projects/ira-memory" }),
+    JSON.stringify({ type: "session", version: 3, id: sessionId, timestamp: "2026-01-01T00:00:00.000Z", cwd: "/home/dev/Projects/recallkeep" }),
     JSON.stringify({
       type: "message", id: "root", parentId: null, timestamp: "2026-01-01T00:00:01.000Z",
       message: { role: "user", content: "hello, this is definitely more than fifty characters long for embedding" },
@@ -96,7 +96,7 @@ function buildFixture(sessionId: string) {
   return { lines, OVERSIZED_RESULT };
 }
 
-describe.skipIf(!TEST_DB_URL)("pi-capture import (needs IRA_TEST_DATABASE_URL)", () => {
+describe.skipIf(!TEST_DB_URL)("pi-capture import (needs RECALLKEEP_TEST_DATABASE_URL)", () => {
   type Row = Awaited<ReturnType<typeof import("./client.js").prisma.message.findMany>>[number];
 
   let prisma: typeof import("./client.js").prisma;
@@ -111,10 +111,10 @@ describe.skipIf(!TEST_DB_URL)("pi-capture import (needs IRA_TEST_DATABASE_URL)",
 
   beforeAll(async () => {
     // pi-capture.ts validates sessionFile is under SESSIONS_ROOT, which it
-    // reads from IRA_PI_SESSIONS_DIR once at module load — so point it at a
+    // reads from RECALLKEEP_PI_SESSIONS_DIR once at module load — so point it at a
     // temp dir first, then import.
-    tmpRoot = mkdtempSync(join(tmpdir(), "ira-pi-capture-test-"));
-    process.env.IRA_PI_SESSIONS_DIR = tmpRoot;
+    tmpRoot = mkdtempSync(join(tmpdir(), "recallkeep-pi-capture-test-"));
+    process.env.RECALLKEEP_PI_SESSIONS_DIR = tmpRoot;
 
     ({ prisma } = await import("./client.js"));
     ({ flushPendingEmbeds } = await import("./embed.js"));
@@ -154,7 +154,7 @@ describe.skipIf(!TEST_DB_URL)("pi-capture import (needs IRA_TEST_DATABASE_URL)",
     expect(result.skippedEmpty).toBe(1);
   });
   test("project resolved from cwd", () => {
-    expect(result.project).toBe("ira-memory");
+    expect(result.project).toBe("recallkeep");
   });
 
   test("root: role is user", () => {
@@ -254,7 +254,7 @@ describe.skipIf(!TEST_DB_URL)("pi-capture import (needs IRA_TEST_DATABASE_URL)",
   });
 
   // --- Phase 4: oversized tool result gets capped, original length recorded ---
-  test("tr2: capped at IRA_PI_TOOLRESULT_CAP (2000)", () => {
+  test("tr2: capped at RECALLKEEP_PI_TOOLRESULT_CAP (2000)", () => {
     expect(byEntryId.get("tr2")!.content.length).toBeLessThanOrEqual(2000);
   });
   test("tr2: metadata.originalLength records the pre-cap (trimmed) size", () => {
