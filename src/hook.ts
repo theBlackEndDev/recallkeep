@@ -10,7 +10,7 @@
  * The harness pipes its event JSON on stdin. Every failure is swallowed: the
  * hook exits 0 with no output, so memory being down never blocks an agent.
  *
- * Payload contracts (verified live 2026-11-20, see docs/integrations.md):
+ * Payload contracts (verified live 2026-11-20, see docs/capture.md):
  *   claude, codex  session_id, cwd, prompt (UserPromptSubmit),
  *                  last_assistant_message (Stop); inject with
  *                  hookSpecificOutput.additionalContext

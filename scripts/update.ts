@@ -5,8 +5,8 @@
  *   bun run update            # or: bun run scripts/update.ts
  *   bun run update -- --dry-run
  *
- * Best-effort + idempotent. Restarts the managed service (systemd ira-memory-api on Linux /
- * launchd com.ira.ira-memory-api on macOS); prints a hint if no managed unit is found.
+ * Best-effort + idempotent. Restarts the managed service (IRA_SERVICE_NAME, else the deploy/
+ * template names, else the older ira-memory-api names); prints a hint if no unit is found.
  */
 import { spawnSync, type SpawnSyncReturns } from 'node:child_process';
 import { resolve } from 'node:path';
@@ -47,12 +47,15 @@ const mig = run('bunx', ['prisma', 'migrate', 'deploy']);
 log('DB', mig.status === 0 ? 'prisma migrate deploy' : `⚠️ migrate exited ${mig.status} — is the DB up? (docker compose up -d)`);
 
 // Restart the managed service so it picks up the new code + .env.
-if (DRY) log('RESTART', 'ira-memory-api');
-else if (OS === 'linux' && spawnSync('systemctl', ['--user', 'restart', 'ira-memory-api.service'], { encoding: 'utf-8' }).status === 0)
-  log('RESTART', 'ira-memory-api (systemd)');
-else if (OS === 'darwin' && spawnSync('launchctl', ['kickstart', '-k', `gui/${userInfo().uid}/com.ira.ira-memory-api`], { encoding: 'utf-8' }).status === 0)
-  log('RESTART', 'ira-memory-api (launchd)');
-else log('RESTART', '⚠️ no managed unit found — restart the memory API manually (bun run memory-api)');
+// Unit names: IRA_SERVICE_NAME first, then the deploy/ templates, then the older names.
+const units = [process.env.IRA_SERVICE_NAME, ...(OS === 'darwin' ? ['dev.ira-memory', 'com.ira.ira-memory-api'] : ['ira-memory.service', 'ira-memory-api.service'])].filter(Boolean) as string[];
+const restartUnit = (u: string) =>
+  OS === 'darwin'
+    ? spawnSync('launchctl', ['kickstart', '-k', `gui/${userInfo().uid}/${u}`], { encoding: 'utf-8' }).status === 0
+    : spawnSync('systemctl', ['--user', 'restart', u], { encoding: 'utf-8' }).status === 0;
+const restarted = DRY ? units[0] : units.find(restartUnit);
+if (restarted) log('RESTART', `${restarted}${DRY ? ' (dry run)' : ''}`);
+else log('RESTART', '⚠️ no managed unit found — set IRA_SERVICE_NAME or restart the memory API manually (bun run memory-api)');
 
 // Health check (best-effort; /health doesn't touch the DB, so also try a DB-backed endpoint).
 if (!DRY) {
