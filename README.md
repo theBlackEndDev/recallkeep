@@ -1,595 +1,314 @@
-# IRA Memory
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/logo-light.png">
+    <img alt="ira-memory" src="docs/assets/logo-light.png" width="420">
+  </picture>
+</p>
 
-Database-backed conversation memory system for IRA / OpenClaw. Stores full conversation history, extracts durable memory facts, and supports structured + semantic retrieval across all sessions and channels.
+<p align="center">
+  <strong>Long-term memory for your AI coding agents. Self-hosted, and it works with the agent you already use.</strong>
+</p>
 
-> This is the **memory backend for [IRA](https://github.com/theBlackEndDev/ira)**. It runs standalone as an HTTP service on `:7775` — the IRA client reaches it over HTTP (`IRA_MEMORY_URL`), so one backend can serve multiple IRA installs across machines. Under IRA's v5 install, session capture and recall are wired automatically by the IRA installer (the `SessionCapture` and `IraRecall` hooks); the `install-hooks` command below is the standalone path for non-v5 setups.
+<p align="center">
+  <a href="https://github.com/theBlackEndDev/ira-memory/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/theBlackEndDev/ira-memory/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="#license"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-blue?style=flat"></a>
+  <img alt="Runs on Bun" src="https://img.shields.io/badge/runtime-Bun-f9f1e1?style=flat&logo=bun&logoColor=black">
+  <img alt="Postgres + pgvector" src="https://img.shields.io/badge/storage-Postgres%20%2B%20pgvector-336791?style=flat&logo=postgresql&logoColor=white">
+  <img alt="MCP server" src="https://img.shields.io/badge/MCP-stdio-7c3aed?style=flat">
+</p>
 
-## Architecture
+<p align="center">
+  <a href="#quickstart">Quickstart</a> •
+  <a href="#connect-your-agent">Connect your agent</a> •
+  <a href="#features">Features</a> •
+  <a href="#how-it-works">How it works</a> •
+  <a href="#words-youll-see">Glossary</a> •
+  <a href="docs/">Docs</a>
+</p>
 
-```
-Assistant (IRA / OpenClaw / Discord / Telegram / CLI)
-        |
-   ┌────┴─────────────────────────────┐
-   │                                  │
-   HTTP Memory API (127.0.0.1:7775)   Programmatic API
-   /memory/* /conversation/*          store() / recall() / search() / summarize()
-   /entity/* /kv/*                    │
-   │                                  │
-   └────┬─────────────────────────────┘
-        |
-  PostgreSQL 16 + pgvector + pg_trgm        +  bun:sqlite sidecar
-   ├── sessions          append-only            ├── entities  (lightweight people/projects)
-   ├── messages           append-only            └── kv        (cron state, flags)
-   ├── memory_facts       curated knowledge
-   ├── summaries          compacted views
-   ├── *_embeddings       1536-dim vectors
-   └── file_sync_records  file-import tracking
-```
+Every time you start a new session, your coding agent has forgotten what you decided yesterday. You explain
+the same rules again, and it reopens questions you already settled. ira-memory fixes this. It keeps your
+decisions, facts and past conversations in a Postgres database on your machine. It gives the relevant ones
+back to the agent at the start of each session and with each prompt you send.
 
-## Quick Start
+It works with any agent that supports MCP (Model Context Protocol, the standard way agents connect to
+tools). It has ready-made hooks for **pi**, **Claude Code**, **OpenAI Codex CLI** and **Google Antigravity
+CLI**. Several agents can share one memory, so a decision made in Claude Code is known in Codex too.
+
+> **Status:** early (v0.1.0), and in daily use by its author since April 2026. Install it from this repo.
+> It is not published to npm.
+
+## Why
+
+<table>
+  <tr>
+    <th width="50%">Without ira-memory</th>
+    <th width="50%">With ira-memory</th>
+  </tr>
+  <tr>
+    <td>Each session starts empty. You paste the same project rules again.</td>
+    <td>Your standing rules and the project's locked decisions are in the agent's context before you type.</td>
+  </tr>
+  <tr>
+    <td>The agent asks you to repeat what you said last week, or decides it again in a different way.</td>
+    <td>The agent searches earlier sessions with <code>memory_search</code> and finds what was said.</td>
+  </tr>
+  <tr>
+    <td>Notes are spread across CLAUDE.md, AGENTS.md and chat logs, a different file for each agent.</td>
+    <td>One store, shared by every agent, with each fact filed under the project it belongs to.</td>
+  </tr>
+  <tr>
+    <td>A hosted memory service keeps your code conversations on someone else's server.</td>
+    <td>Everything stays in your own Postgres. With the <code>none</code> or <code>local</code> provider, nothing leaves your machine.</td>
+  </tr>
+</table>
+
+## Features
+
+- **Context at session start.** The agent gets your standing rules (for every project), the locked decisions
+  for this project, and its newest facts.
+- **Recall for each prompt.** Before the agent reads your prompt, ira-memory adds the stored facts that best
+  match it.
+- **Agent tools.** `memory_search`, `memory_save`, `memory_context`, `memory_list` and `memory_forget` work in
+  any MCP client.
+- **Hybrid search.** Full-text search and semantic (vector) search are combined. Results are ranked by
+  relevance, recency, tier and confidence.
+- **Projects without setup.** The project comes from the folder you work in. `~/Projects/my-app/src` is
+  `my-app`.
+- **Conversation capture.** Each turn is logged. pi sessions are captured in full, including tool calls.
+- **Secrets removed.** Captured conversations go through betterleaks or gitleaks plus a pattern check before
+  they are stored.
+- **Decisions layer.** An LLM pass picks out settled decisions from pi transcripts, so they are not reopened later.
+- **Maintenance.** Session summaries, lesson extraction, promotion from short-term to long-term, conflict
+  detection, export and backup.
+- **Your choice of model.** OpenAI, Gemini, a local server such as Ollama, or no LLM at all.
+- **Safe defaults.** The API listens on 127.0.0.1 only, rejects browser requests, and takes an optional
+  bearer token.
+
+## Before you start
+
+You need:
+
+- [Bun](https://bun.sh) 1.2 or newer.
+- [Docker](https://docs.docker.com/get-docker/) to run Postgres with pgvector. Any Postgres 16 with the
+  `vector` and `pg_trgm` extensions also works. Point `MEMORY_DATABASE_URL` at it.
+- Optional: an OpenAI or Gemini API key, or [Ollama](https://ollama.com), for semantic search and summaries.
+  Without one, ira-memory still works, and search uses full text and project tags.
+
+## Quickstart
+
+This setup uses no API key and makes no external calls. It takes about five minutes.
 
 ```bash
-# 1. Start the database
-docker compose up -d
-
-# 2. Create .env file
-cp .env.example .env
-# Edit .env to add your OPENAI_API_KEY
-
-# 3. Install dependencies
+git clone https://github.com/theBlackEndDev/ira-memory.git
+cd ira-memory
 bun install
+cp .env.example .env
+echo 'IRA_LLM_PROVIDER="none"' >> .env   # no LLM; change this later, see below
 
-# 4. Run migrations (first time only)
-bunx prisma migrate dev
-
-# 5. Verify
-bun run src/cli.ts stats
-
-# 6. (optional) Start the HTTP Memory API on 127.0.0.1:7775
-bun run memory-api
+docker compose up -d                     # Postgres + pgvector on 127.0.0.1:5433
+bunx prisma migrate deploy               # create the tables
+bun run memory-api                       # the API on http://127.0.0.1:7775
 ```
 
-## Updating an existing install
+Leave that running, and open a second terminal to check that it works:
 
 ```bash
-bun run update          # git pull (ff-only) + bun install + prisma migrate deploy + restart service + health check
-bun run update -- --dry-run
+curl -s http://127.0.0.1:7775/health
+# {"status":"ok","backend":"ira-memory","port":7775}
+
+curl -s -X POST http://127.0.0.1:7775/memory \
+  -H 'Content-Type: application/json' \
+  -d '{"content":"We deploy with blue-green releases.","project":"my-app","tags":["decision"]}'
+
+bun run src/cli.ts recall --query "how do we deploy"
 ```
 
-Restarts the managed service (systemd `ira-memory-api` / launchd `com.ira.ira-memory-api`) so it
-picks up new code and `.env` changes; prints a hint if there's no managed unit. Idempotent and
-safe to re-run; it stops on uncommitted tracked changes (commit/stash first).
+Next, [connect your agent](#connect-your-agent). To start ira-memory at login, see
+[Run it in the background](#run-it-in-the-background).
 
-## HTTP Memory API
+### Choose an LLM provider
 
-`src/http-server.ts` exposes a single shared memory surface across every channel
-(Discord, Telegram, CLI, webchat). Start it with:
+The LLM computes embeddings for semantic search, and it writes summaries. Set `IRA_LLM_PROVIDER` in `.env`:
+
+| Provider | What you need | What leaves your machine |
+|---|---|---|
+| `none` | Nothing | Nothing. Search uses full text and project tags |
+| `local` | Ollama or LM Studio on `localhost:11434` (`ollama pull nomic-embed-text` and `ollama pull llama3.2`) | Nothing |
+| `openai` (default) | `OPENAI_API_KEY` | Text sent for embeddings and summaries |
+| `gemini` | `GEMINI_API_KEY` | Text sent for embeddings and summaries |
+
+Choose the embedding model before you store much data. Vectors from different models cannot be compared.
+To fill in embeddings later, run `bun run src/cli.ts backfill`. Details:
+[docs/configuration.md](docs/configuration.md).
+
+## Connect your agent
+
+Each agent gets two things:
+
+1. **The MCP server** for the tools. The agent starts it with `bun /PATH/TO/ira-memory/src/cli.ts mcp`.
+   The server talks to the API you started above.
+2. **Hooks** for automatic memory: context at session start, recall on each prompt, and turn logging.
+   Hooks fail open. If ira-memory is down, the agent runs as normal.
+
+In the commands below, replace `/PATH/TO/ira-memory` with the full path to your clone (run `pwd` inside it).
+The MCP tools are the same in every agent:
+
+| Tool | What it does |
+|---|---|
+| `memory_search` | Searches facts and past conversations. Defaults to the current project. `project: "all"` searches everything. |
+| `memory_save` | Saves a fact. Tag it `decision` to show it at every session start. `project: "global"` makes it a rule for every project. |
+| `memory_context` | Returns the session-start block on request, for clients without hooks. |
+| `memory_list` | Lists a project's newest facts with their ids. |
+| `memory_forget` | Archives a fact by id. Archived facts are kept but no longer recalled. |
+
+### Claude Code
+
+Verified with Claude Code 2.1.327.
 
 ```bash
-bun run memory-api
-# → [memory-api] listening on http://127.0.0.1:7775
+claude mcp add ira-memory -s user -- bun /PATH/TO/ira-memory/src/cli.ts mcp
 ```
 
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `/health` | GET | Liveness check — returns `{status, backend, port}` |
-| `/conversation/log` | POST | Append a message (`role`, `content`, `channel`) — auto-creates a long-lived per-channel session |
-| `/conversation/recent` | GET | Latest messages — optional `?channel=` and `?limit=` |
-| `/conversation/search` | GET | Full-text message search (`?q=`) |
-| `/memory` | POST | Store a fact (`type` ∈ `user`/`feedback`/`project`/`reference`, `name`, `content`, `description`) |
-| `/memory/list` | GET | List facts (`?limit=`) |
-| `/memory/recall` | GET | Multi-layer recall (`?topic=`) |
-| `/memory/search` | GET | Full-text fact search (`?q=`) |
-| `/memory/<id>` | DELETE | Soft-archive a fact |
-| `/entity` | POST | Create entity in sidecar (`name`, `type`, `details`) |
-| `/entity/search` | GET | Search entities (`?q=`) |
-| `/kv/<key>` | GET / PUT / DELETE | Scratch key-value (cron state, flags) |
-| `/session/sync` | POST | Import (or re-import) a **pi** session transcript from disk — `{sessionFile, sessionId?, cwd?, final?}`. Path only, never content; see [pi Session Capture](#pi-session-capture). |
-| `/conversation/recall` | GET | Hybrid FTS + semantic recall over raw messages, project/channel scoped (`?q=`, `?project=`, `?channel=`, `?limit=`) |
-| `/conversation/message/<id>` | GET | Fetch one message in full — the "expand" half of a truncated-search-result workflow |
+Copy the `hooks` block from [`integrations/claude-code/settings.json`](integrations/claude-code/settings.json)
+into `~/.claude/settings.json` for all projects, or into `.claude/settings.json` for one project.
 
-Friday-style memory `type` is mapped to ira-memory categories at the boundary:
-`user → PREFERENCE`, `feedback → LESSON`, `project → PROJECT_STATE`, `reference → CONTEXT`.
+### OpenAI Codex CLI
 
-`/entity` and `/kv` use a `bun:sqlite` sidecar at `~/.claude/memory-api-sidecar.db`
-so the Postgres schema stays clean.
+Verified with Codex CLI 0.167.1.
 
-Bind address and port are configurable via `MEMORY_API_HOST` / `MEMORY_API_PORT`.
+Add [`integrations/codex/config.toml`](integrations/codex/config.toml) to `~/.codex/config.toml`. Codex asks you
+to trust new hooks: open `/hooks` in Codex and approve the three ira-memory hooks. In testing, Codex did not
+load hooks from a project's `.codex/hooks.json`, but it did load the inline `[hooks]` tables in
+`config.toml`.
 
-## Claude Code Session Capture
+### Google Antigravity CLI
 
-Automatically capture all your Claude Code conversations into ira-memory.
-
-### Install
+Verified with `agy` 1.5.13. Antigravity CLI replaced Gemini CLI.
 
 ```bash
-bun run src/cli.ts install-hooks
+agy mcp add ira-memory bun /PATH/TO/ira-memory/src/cli.ts mcp
 ```
 
-This adds a `SessionEnd` hook to `~/.claude/settings.json`. Every time a Claude Code session ends, the full transcript is parsed and stored — including user prompts, assistant responses, session metadata, and auto-generated summaries.
+Copy [`integrations/antigravity/hooks.json`](integrations/antigravity/hooks.json) to `.agents/hooks.json` in your
+workspace, or to `~/.gemini/config/hooks.json` for all workspaces. `agy` has no prompt-submit event, so the
+recall hook runs on `PreInvocation`. ira-memory looks up memory once per turn and reuses the result for the
+other model calls in that turn.
 
-### What gets captured
+### pi
 
-- All user and assistant messages (tool calls are excluded to reduce noise)
-- Session metadata: working directory, timestamp, CC session ID
-- Auto-generated summary via LLM on session close
-- Auto-extracted learnings (decisions, mistakes, best practices)
-
-### Manual capture
-
-Import a specific transcript file:
+pi gets a full extension. It injects context at session start, syncs the complete transcript (including tool
+calls) after each turn, writes a handoff note when you quit, and adds the `memory_search` and `memory_save`
+tools plus the `/memory` and `/handoff` commands.
 
 ```bash
-bun run src/cli.ts capture --transcript ~/.claude/sessions/<id>/transcript.jsonl
+mkdir -p ~/.pi/agent/extensions
+cp -R /PATH/TO/ira-memory/integrations/pi ~/.pi/agent/extensions/memory
 ```
 
-### Verify
+See [`integrations/pi/README.md`](integrations/pi/README.md). For the tools only, use
+`pi mcp add ira-memory -- bun /PATH/TO/ira-memory/src/cli.ts mcp` instead.
 
-After a Claude Code session ends:
+### Any other MCP client
+
+Cursor, Windsurf, Cline, VS Code and others can start the same server. Use command `bun` with arguments
+`/PATH/TO/ira-memory/src/cli.ts mcp`. They get the tools but no hooks, so paste
+[`integrations/AGENTS.md`](integrations/AGENTS.md) into your agent instructions. It tells the agent to call
+`memory_context` at the start and to save decisions.
+
+### Run it in the background
+
+`scripts/start.sh` waits for Docker, starts Postgres, applies migrations and runs the API. Service templates
+call it:
+
+- **macOS:** [`deploy/launchd/dev.ira-memory.plist`](deploy/launchd/dev.ira-memory.plist)
+- **Linux:** [`deploy/systemd/ira-memory.service`](deploy/systemd/ira-memory.service)
+
+Each file explains in its header how to install it. To update later, run `bun run update`. It pulls,
+installs, migrates and restarts the service.
+
+## How it works
+
+```text
+ your agent ──hooks──▶ bun src/cli.ts hook ─┐
+     │                                       ├──HTTP──▶ API server :7775 ──▶ Postgres + pgvector
+     └──MCP────────▶ bun src/cli.ts mcp ────┘              │
+                                                           └──▶ LLM provider (optional): embeddings, summaries
+```
+
+- **Facts** are short, curated statements: a decision, a rule, a finding. You or the agent save them.
+- **Messages** are conversation turns captured by hooks. Long ones are split into chunks for search.
+- **Recall** runs full-text and vector search, then ranks the results by relevance (60%), recency (15%), tier
+  (15%) and confidence (10%). Facts from the current project get a boost.
+- **Maintenance** (`bun run src/cli.ts maintain`, or `scripts/cron-maintain.sh`) moves short-term facts that
+  were saved on purpose or have high confidence up to `DAILY` and then `LONG_TERM`. It archives the
+  low-confidence short-term ones after 48 hours.
+
+Full details: [docs/how-it-works.md](docs/how-it-works.md).
+
+## Words you'll see
+
+| Word | Meaning |
+|---|---|
+| **Fact** | One saved piece of knowledge, such as "We deploy with blue-green releases." |
+| **Decision** | A fact tagged `decision`. It is shown at the start of every session in its project. |
+| **Standing rule** | A fact saved under the project `global`. It is shown at the start of every session in every project. |
+| **Project slug** | The project name, taken from your folder. `~/Projects/my-app/src` becomes `my-app`. |
+| **Recall** | Finding the facts most relevant to a question and ranking them. |
+| **Embedding** | A list of numbers that represents the meaning of a text. Texts with similar meanings get similar numbers. |
+| **pgvector** | The Postgres extension that stores embeddings and finds similar ones. |
+| **MCP** | Model Context Protocol, the standard way agents connect to tools. ira-memory runs as an MCP server over stdio. |
+| **Hook** | A command your agent runs at set moments, such as session start or prompt submit. |
+| **Tier** | How long a fact lives: `SHORT_TERM`, `DAILY` or `LONG_TERM`. |
+
+## Security and privacy
+
+- The API listens on `127.0.0.1` only. To expose it on another address you must set `IRA_API_TOKEN`, and
+  clients then send `Authorization: Bearer <token>`.
+- Browser requests are rejected, so a web page you visit cannot read your memory. To allow a specific origin,
+  set `IRA_CORS_ORIGINS`.
+- Postgres is published on `127.0.0.1` only. Change `IRA_DB_PASSWORD` before the first `docker compose up` if
+  other people use your machine.
+- Logged turns and pi transcripts are redacted before they are stored. Facts saved with `memory_save` are not
+  redacted, so do not save secrets.
+
+More: [docs/privacy.md](docs/privacy.md).
+
+## Docs
+
+| Document | Covers |
+|---|---|
+| [Configuration](docs/configuration.md) | Providers, embeddings, every environment variable |
+| [CLI](docs/cli.md) | Every command: `recall`, `store`, `summarize`, `export`, `backup`, `mcp`, `hook` and more |
+| [HTTP API](docs/api.md) | Every endpoint, with parameters and headers |
+| [Capture](docs/capture.md) | How Claude Code, Codex, Antigravity and pi sessions are recorded |
+| [How it works](docs/how-it-works.md) | Architecture, ranking, projects, decisions, summaries, tiers |
+| [Privacy](docs/privacy.md) | What is stored, what is redacted, what leaves the machine |
+| [Migration and updates](docs/migration.md) | Importing file-based memory, updating, backup and restore |
+| [Development](docs/development.md) | Repo layout, programmatic API, tests, CI |
+
+## Working on ira-memory
 
 ```bash
-bun run src/cli.ts stats      # Check message/session counts
-bun run src/cli.ts sessions    # List captured sessions
+bun install
+bun run typecheck
+bun test                 # unit tests; database tests are skipped
 ```
 
-## pi Session Capture
-
-Automatically capture full **pi** (`@earendil-works/pi-coding-agent`) sessions — every
-turn, both roles, untruncated — from the transcripts pi already writes to
-`~/.pi/agent/sessions/**/*.jsonl` on every turn. This is the mirror-image of Claude
-Code capture above: same spine (parse → extract → dedup → store), different source
-format and a different trigger (a pi extension posts a file path, not a hook reading a
-finished transcript).
-
-Full design rationale, the incident that motivated it, and every alternative
-considered and rejected: `~/Projects/Plans/pi-ira-memory-capture.md`.
-
-### How it's wired
-
-The pi extension at `~/.pi/agent/extensions/memory/` posts `POST /session/sync` after
-each settled turn (debounced 10s) and once more, awaited, on session shutdown — a
-`{sessionFile, cwd, final}` path, never message content. `src/pi-capture.ts` reads that
-file itself:
-
-- **User + assistant text**, full and untruncated below `IRA_PI_MESSAGE_CAP` (default
-  50 000 chars). `thinking` blocks are dropped — model-dependent, absent on Anthropic,
-  and restated in the visible answer.
-- **Tool calls** → their own row (`role: "assistant"`, `tool_name`/`tool_input` set,
-  content a short searchable marker `→ name(args)`).
-- **Tool results** → their own row (`role: "tool"`, `tool_name`/`tool_output` set),
-  head-capped at `IRA_PI_TOOLRESULT_CAP` (default 2000 chars — p50 tool-result size
-  measured across this codebase's own sessions was 416 chars, so most survive whole).
-  Never embedded — 89% of raw transcript volume is tool output, and embedding it
-  would drown real conversation text in semantic recall.
-- **Idempotent per transcript entry** (`metadata.piEntryId`), so re-syncing a growing
-  file only imports what's new. Off-leaf-path entries (abandoned `/branch` subtrees)
-  are still imported, just tagged `metadata.offPath: true` and excluded from default
-  recall.
-- **Project slug**: same `deriveProjectSlug` as everything else in this file — pi
-  sessions get `metadata.project` set on the session row.
-
-### Redaction
-
-Every pending message's text is redacted **before** `storeMessage` — which is also
-before the async embed call reads the row, so a secret never reaches the embeddings
-API either (`src/redact.ts`). One subprocess call per sync batches every pending
-message's redaction together, not one call per message.
-
-Engine chain, **composed, not waterfalled**:
-
-1. **betterleaks** (`brew install betterleaks`) — BPE rarity + contextual filtering,
-   so it doesn't flag prose that merely mentions a `KEY=value` shape.
-2. **gitleaks** — fallback if betterleaks isn't installed, same finding schema.
-3. **heuristic** (regex, always available, zero dependency) — runs **on top of**
-   whichever CLI engine ran, always, not only as a last resort.
-
-Why composed: verified directly that both betterleaks and gitleaks missed a real
-Anthropic session key sitting in a tool result — both are keyword/context-gated and
-the surrounding code didn't trigger either engine's prefilter. A pure "prefer the
-accurate engine" design treats CLI silence as authoritative, which is backwards: a
-benign line getting an extra `[REDACTED]` placeholder is recoverable (pi's JSONL on
-disk is never modified — re-import fixes it), a real secret silently surviving in
-Postgres is not. `metadata.redactionEngine` records which tier(s) actually redacted
-each row (`betterleaks`, `gitleaks`, `heuristic`, or `betterleaks+heuristic` /
-`gitleaks+heuristic` when both contributed).
-
-If the engine chain improves later, existing rows don't retroactively benefit —
-redaction only runs at import time. Re-scan everything already stored:
+To run the database tests and the API contract smoke test, create a throwaway database. Never use the one
+that holds your memory.
 
 ```bash
-bun run redact-rescan            # updates any row whose content changes under the current chain
-bun run redact-rescan -- --dry-run
-```
-
-### Retrieval
-
-- `GET /conversation/recall?q=&project=&limit=` — hybrid FTS + pgvector over raw
-  messages, scoped by `metadata.project` and/or `channel`. This is what the pi
-  extension's `memory_search` LLM tool calls.
-- `GET /conversation/message/<id>` — fetch one message in full; the "expand" half of
-  a truncated-search-result-then-expand workflow.
-- **Session summaries** run inline on session close (`closeSession(id, {summarize:
-  true})`) — safe here because this is a long-lived server process, unlike Claude
-  Code's SessionEnd hook subprocess, which cc-capture.ts deliberately skips
-  summarizing to avoid a 5-10s OpenAI call getting killed mid-flight.
-- **Catch-all topic tags**: pi sessions whose cwd resolves to the bare `~/Projects`
-  root (no specific project — a deliberate catch-all, not a bug) get a companion fact
-  tagged `project:Projects` + `pi:session-topic` + `topic:<x>` per generated summary
-  topic, so that bucket stays searchable by subject instead of only by date.
-
-### Decisions extraction
-
-`src/decisions.ts` — a session-close LLM pass distinct from `learn()`'s
-MISTAKE/BEST_PRACTICE taxonomy. Extracts **locked decisions** specifically: what was
-decided and why, filtered for explicit lock language ("locked", "decided", "let's go
-with X") versus open questions or rejected options. Stored as `category: DECISION`,
-`tier: LONG_TERM` (a locked decision shouldn't decay through the `SHORT_TERM` 48h
-promotion path the way a passing preference does), tagged `["decision",
-"project:<slug>"]`. Deduped against existing decisions (not the whole fact corpus) via
-semantic similarity, so restating a decision in a later session doesn't spam a
-duplicate row.
-
-The pi extension injects the current project's decisions into the system prompt at
-session start, ahead of the handoff (`## Locked decisions for this project`, budget
-~2000 chars). This is the direct fix for the incident that motivated pi capture: an
-audit agent flagged nine already-settled decisions as open, because nothing in memory
-distinguished LOCKED from merely-discussed. Verified end to end — a fresh agent given
-only this injection correctly listed a previously-contested item as settled and cited
-its source, rather than re-flagging it.
-
-## LLM provider — running without OpenAI
-
-ira-memory uses an LLM for two things: **embeddings** (semantic recall) and **summaries** (session
-summaries + fact extraction). Both go through a single provider switch (`src/llm.ts`), so you can
-run with no OpenAI dependency. Set `IRA_LLM_PROVIDER` in `.env`:
-
-| Provider | Embeddings + summaries | Set | Data leaves box? |
-|----------|------------------------|-----|------------------|
-| `openai` *(default)* | OpenAI cloud | `OPENAI_API_KEY` | yes (OpenAI) |
-| `gemini` | Google Gemini (OpenAI-compat endpoint) — Flash + Gemini embeddings | `GEMINI_API_KEY` | yes (Google) |
-| `local` | OpenAI-compatible local server (Ollama / LM Studio) | `OPENAI_BASE_URL` (default `:11434/v1`) | **no** |
-| `none` | nothing — embeddings + summaries skipped | — | **no** |
-
-**Recall degrades gracefully.** With embeddings off (`none`, or `IRA_EMBED=off`), recall drops the
-semantic layer and falls back to full-text + structured + project-tag search — conversation logging,
-manual facts, and project-scoped recall all still work.
-
-Common setups:
-- **Completely local / nothing leaves the box:** `IRA_LLM_PROVIDER=none` (zero infra), or
-  `IRA_LLM_PROVIDER=local` with Ollama for full semantic recall (needs a local model server).
-- **Reuse a Gemini subscription (no OpenAI bill):** `IRA_LLM_PROVIDER=gemini` + `GEMINI_API_KEY`.
-  Add `IRA_EMBED=off` to get Flash summaries with full-text recall and skip the embedding-dimension
-  step entirely. Leave embeddings on for semantic recall — `gemini-embedding-001` emits 1536 dims
-  (we request it), matching the schema, so no migration is needed.
-
-> Embedding dimension: the pgvector schema is `vector(1536)`. OpenAI `text-embedding-3-small` and
-> Gemini `gemini-embedding-001` both emit 1536 (we pass `dimensions`). A fixed-size local model
-> (e.g. Ollama `nomic-embed-text` = 768) needs either `IRA_EMBED=off`, or `IRA_EMBED_DIMS=768` plus
-> a migration of the `*_embeddings` columns — only clean on a fresh DB.
-
-## Configuration
-
-All config lives in `.env`:
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `MEMORY_DATABASE_URL` | PostgreSQL connection string | `postgresql://ira_memory:ira_memory_secret@localhost:5433/ira_memory` |
-| `IRA_LLM_PROVIDER` | `openai` \| `gemini` \| `local` \| `none` (see above) | `openai` |
-| `OPENAI_API_KEY` | Required for `provider=openai` (embeddings + summarization) | — |
-| `GEMINI_API_KEY` | Required for `provider=gemini` | — |
-| `IRA_EMBED` | Set to `off` to disable embeddings independent of provider | on |
-| `MEMORY_API_HOST` | HTTP API bind address | `127.0.0.1` |
-| `MEMORY_API_PORT` | HTTP API port | `7775` |
-| `IRA_BUN_PATH` | Absolute path to `bun` binary — only set when bun isn't at `~/.bun/bin/bun` (nvm/asdf/pnpm/nix). Used by `install-hooks` and `scripts/cron-maintain.sh`. | `~/.bun/bin/bun` |
-| `IRA_BACKUP_DIR` | Directory for `backup` / `restore` pg_dump files | `<project>/backups` |
-| `IRA_PROJECT_DIR` | Override project root for `scripts/cron-maintain.sh` | auto-resolved |
-| `IRA_LOG_DIR` | Override log directory for `scripts/cron-maintain.sh` | `<project>/logs` |
-| `IRA_PI_MESSAGE_CAP` | pi capture: user/assistant text cap (chars) | `50000` |
-| `IRA_PI_TOOLRESULT_CAP` | pi capture: tool-call args / tool-result content cap (chars) | `2000` |
-| `IRA_DECISIONS_CONVO_CAP` | Decisions extraction: conversation window sent to the LLM (chars) — larger than summarize.ts/learn.ts's 12000 on purpose, since locked decisions tend to show up late in a long session | `60000` |
-
-The database runs as `ira-memory-db` via the local `docker-compose.yml` on port **5433** (not 5432, to avoid conflicts with other Postgres instances).
-
-## CLI Reference
-
-```
-bun run src/cli.ts <command> [options]
-```
-
-### Core Operations
-
-| Command | Description | Example |
-|---------|-------------|---------|
-| `store` | Store a memory fact | `store --category DECISION --content "Use pgvector for search" --tier LONG_TERM` |
-| `list` | List facts with filters | `list --category TODO --tier DAILY --limit 10` |
-| `forget` | Soft-archive a fact | `forget <fact-id>` |
-| `delete` | Permanently delete a fact | `delete <fact-id>` |
-| `sessions` | List conversation sessions | `sessions --limit 5` |
-| `stats` | Show counts and breakdowns | `stats` |
-
-### Search & Recall
-
-| Command | Description | Example |
-|---------|-------------|---------|
-| `search` | Full-text search (PostgreSQL tsvector) | `search pgvector deployment` |
-| `semantic` | Vector similarity search (pgvector) | `semantic "what tech stack do we use" --tables facts,messages` |
-| `recall` | Multi-layer recall (structured + FTS + semantic) | `recall --query "auth decisions" --categories DECISION --since 2026-03-01` |
-
-### Summarization
-
-| Command | Description | Example |
-|---------|-------------|---------|
-| `summarize` | Generate a summary | `summarize --scope SESSION --session <id>` |
-| | | `summarize --scope DAILY --date 2026-04-05` |
-| | | `summarize --scope WEEKLY --date 2026-03-31` |
-| | | `summarize --scope PROJECT --project the-forge` |
-| `summarize-pending` | Process all sessions captured by the SessionEnd hook that haven't been summarized yet (off the hook hot path) | `summarize-pending` |
-
-### Maintenance
-
-| Command | Description | Example |
-|---------|-------------|---------|
-| `maintain` | Run tier promotion + expiration | `maintain` |
-| `compact` | Truncate old messages, drop old embeddings | `compact --days 90` |
-| `conflicts` | Detect contradictory facts | `conflicts --limit 20` |
-| `threads` | Show cross-session threading chains | `threads` |
-| `detect-sensitive` | Scan and auto-flag sensitive facts | `detect-sensitive` |
-
-### Import / Export / Backup
-
-| Command | Description | Example |
-|---------|-------------|---------|
-| `import` | Import from file-based memory | `import --memory-md /path/to/MEMORY.md --daily-dir /path/to/memory/` |
-| `export` | Export as JSON or markdown | `export --format md` or `export --format json` |
-| `backup` | Create a timestamped pg_dump | `backup` |
-| `restore` | Restore from a pg_dump file | `restore ./backups/ira-memory-2026-04-06.sql` |
-| `backfill` | Generate embeddings for unembedded items | `backfill --type facts --batch 50` |
-
-Retroactively tag historical facts with `project:<slug>` (idempotent, no LLM, metadata-only). Two passes: **session-derived** (tags facts whose session `cwd` resolves to a slug — both `~/Projects/` and `/srv/projects/` layouts) and **content-prefix** (tags facts whose content starts with `[<slug>]` but lack the tag, e.g. manually-POSTed facts with no session). Only sessions that recorded a `cwd` are taggable; everything captured going forward tags automatically.
-
-```bash
-bun run src/backfill-project-tags.ts --dry-run            # preview groups + counts
-bun run src/backfill-project-tags.ts                       # apply (all projects)
-bun run src/backfill-project-tags.ts --project faceless-youtube   # scope to one
-```
-
-### Learning loop
-
-| Command | Description | Example |
-|---------|-------------|---------|
-| `learn` | Record session ratings + auto-extracted lessons | `learn --session <id> --rating 8` |
-| `discover` | Mine repeated patterns across sessions into PREFERENCE/LESSON facts | `discover --since 2026-04-01` |
-| `synthesize` | Roll up related facts into higher-confidence consolidated facts | `synthesize --tag project:the-forge` |
-
-### Categories and Tiers
-
-**Categories:** `PREFERENCE`, `DECISION`, `PLAN`, `TODO`, `FACT`, `LESSON`, `CHECKPOINT`, `CONTEXT`, `TOOL_CONFIG`, `PROJECT_STATE`
-
-**Tiers:**
-- `SHORT_TERM` -- expires after 48h unless promoted (default for new facts)
-- `DAILY` -- weekly rolling window
-- `LONG_TERM` -- persistent, never auto-deleted
-
-Tier promotion runs via `maintain`:
-```
-SHORT_TERM ──(48h, confidence >= 0.7)──> DAILY ──(7d)──> LONG_TERM
-SHORT_TERM ──(48h, low confidence)──> archived
-```
-
-## Programmatic API
-
-```typescript
-import {
-  openSession, closeSession, storeMessage, store,
-  recall, textSearch, semanticSearch,
-  summarize, promoteAndExpire, detectConflicts,
-  exportAll, exportMarkdown, backup, restore,
-  importFromFiles, prisma,
-} from "./src/index.js";
-
-// Open a session
-const session = await openSession({ channel: "cli", title: "My Session" });
-
-// Store messages
-await storeMessage({ sessionId: session.id, role: "user", content: "Hello" });
-await storeMessage({ sessionId: session.id, role: "assistant", content: "Hi there" });
-
-// Store a fact (auto-embeds, auto-detects sensitive content)
-await store({
-  category: "DECISION",
-  content: "We chose PostgreSQL over SQLite for the memory system",
-  tier: "LONG_TERM",
-  source: "explicit",
-  tags: ["infrastructure"],
-});
-
-// Recall with multi-layer search (structured + FTS + semantic)
-const results = await recall({
-  query: "database choice",
-  categories: ["DECISION"],
-  limit: 10,
-});
-
-// Pure semantic search
-const similar = await semanticSearch({
-  query: "what database are we using",
-  tables: ["facts", "summaries"],
-  threshold: 0.4,
-});
-
-// Close session (auto-generates summary via LLM)
-const { summary } = await closeSession(session.id);
-```
-
-## Retrieval Strategy
-
-Recall executes a four-layer stack and merges results by score:
-
-| Layer | Method | When Used |
-|-------|--------|-----------|
-| 1. Exact Lookup | SQL by ID | Direct session/fact references |
-| 2. Structured Filter | SQL WHERE | Category, tier, time range, tags |
-| 3. Full-Text Search | tsvector/tsquery | Keyword queries |
-| 4. Semantic Search | pgvector cosine similarity | Free-form natural language |
-
-Scoring formula:
-```
-score = 0.3 * recency + 0.4 * relevance + 0.2 * tier_weight + 0.1 * confidence
-```
-
-## Data Flow
-
-```
-1. User sends message
-   ├── storeMessage() writes to DB
-   └── embedMessageAsync() queues embedding (non-blocking)
-
-2. Assistant responds
-   ├── storeMessage() writes to DB
-   └── Detects facts → store() with auto-embed + auto-sensitive-detect
-
-3. Session ends
-   ├── closeSession() sets endedAt
-   └── summarize(SESSION) generates LLM summary + extracts facts
-
-4. Daily/weekly maintenance
-   ├── summarize(DAILY) rolls up session summaries
-   ├── summarize(WEEKLY) rolls up daily summaries
-   └── promoteAndExpire() manages tier lifecycle
-```
-
-## Privacy Model
-
-Single-user, unified memory pool. All channels (CLI, webchat, Telegram, Discord) share one memory space with no access isolation.
-
-- `session.channel` is metadata for filtering, not an access boundary
-- `isSensitive` auto-flags API keys, passwords, tokens, SSNs, credit card numbers
-- Sensitive facts are excluded from `exportMarkdown()` and LLM-generated summaries
-- Sensitive facts remain queryable directly by the user
-- `forget()` soft-archives; `hardDelete()` permanently removes fact + embedding
-
-## File Structure
-
-```
-ira-memory/
-├── prisma/
-│   ├── schema.prisma                Full data model
-│   └── migrations/                  Prisma + custom SQL migrations
-├── src/
-│   ├── index.ts                     Public API barrel export
-│   ├── types.ts                     TypeScript interfaces
-│   ├── client.ts                    Prisma client singleton
-│   ├── store.ts                     Write operations (sessions, messages, facts)
-│   ├── recall.ts                    Multi-layer recall (structured + FTS + semantic)
-│   ├── search.ts                    Semantic vector search (pgvector)
-│   ├── embed.ts                     Embedding generation + backfill (OpenAI)
-│   ├── summarize.ts                 LLM summarization — auto-tags facts with project:<slug> derived from session cwd
-│   ├── maintain.ts                  Tier promotion, expiration, conflict detection, compaction
-│   ├── export.ts                    JSON/markdown export, pg_dump backup/restore, sensitive detection
-│   ├── import.ts                    File-based memory parser (MEMORY.md, daily/*.md)
-│   ├── cli.ts                       CLI interface
-│   ├── cc-capture.ts                Claude Code SessionEnd hook (write-only fast path)
-│   ├── hook-bridge.ts               Subcommand router for Claude Code hooks (recall-context is project-aware)
-│   ├── pi-capture.ts                pi session transcript importer — user/assistant/tool rows, batched redaction, idempotent (see pi Session Capture)
-│   ├── redact.ts                    Redaction engine chain: betterleaks → gitleaks → heuristic, composed not waterfalled
-│   ├── redact-rescan.ts             Re-redact everything already stored, for when the engine chain improves
-│   ├── decisions.ts                 LLM pass extracting LOCKED decisions (distinct from learn.ts's lesson taxonomy)
-│   ├── http-server.ts               HTTP Memory API on 127.0.0.1:7775 (Postgres + sqlite sidecar)
-│   ├── learn.ts                     Session ratings + lesson extraction
-│   ├── discover.ts                  Cross-session pattern mining
-│   ├── synthesize.ts                Fact consolidation
-│   ├── backfill-project-tags.ts     Retroactively tag facts with project:<slug>
-│   ├── test-e2e.ts                  End-to-end test suite (28 assertions)
-│   ├── test-flow.ts                 Integration smoke test
-│   ├── slug.test.ts                 deriveProjectSlug unit tests (pure, no DB) — parity contract with the pi extension's own slug.test.ts
-│   ├── redact.test.ts               Redaction engine chain tests, including the real secret a waterfall design missed
-│   ├── pi-capture.test.ts           pi transcript import: branches, tool calls/results, redaction, idempotency
-│   └── recall.test.ts               recallMessages() regression test, run against real captured session data
-├── scripts/
-│   └── cron-maintain.sh             Hourly maintain + summarize-pending + embedding backfill
-├── backups/                         pg_dump backup files (gitignored)
-├── logs/                            cron output (gitignored)
-├── .env                             Database URL + OpenAI key
-├── docker-compose.yml               Postgres 16 + pgvector container
-├── package.json
-└── tsconfig.json
-```
-
-## Project-Scoped Recall
-
-Recall is biased toward the project a session is working in, so a dense project's
-memory never drowns the one you're actually in.
-
-**Slug derivation** (`deriveProjectSlug`, the single source of truth in `summarize.ts`)
-recognizes both layouts, returning the immediate child of the projects dir:
-
-- `/srv/projects/<slug>/...` (server layout)
-- `~/Projects/<slug>/...` (home layout, e.g. macOS)
-
-**At write time**, facts extracted by session summarization are tagged
-`project:<slug>` (derived from `session.metadata.cwd`) and their content is prefixed
-with `[<slug>]` so FTS/semantic queries match the slug too.
-
-**At recall time**, scoping has two distinct modes — a deliberate intent split:
-
-| Caller passes | Mode | Behavior |
-|---------------|------|----------|
-| `?project=` / `X-Project` header | **Hard filter** (`tags`) | Tag-scoped or nothing. Used by the resume-session skill — a deliberate "show me only this project." |
-| `X-Cwd` header | **Soft boost** (`boostTags`) | Same-project facts get a large additive score bump (`+0.5`) and rank first, but other projects still surface — so a sparse/new project never returns an empty recall. Used for ambient per-prompt recall. |
-
-The IRA recall hook (`IraRecall`) sends `X-Cwd`, over-fetches, and shows the top
-results — so the current repo's facts float up automatically. Project-less callers
-stay global (back-compatible).
-
-To tag historical data after a deploy or a layout change, run the backfill (see below).
-
-## Migration from File-Based Memory
-
-The system coexists with the existing file-based memory (`MEMORY.md`, `memory/*.md`). Migration is incremental:
-
-| Phase | Files | Database |
-|-------|-------|----------|
-| **0: Coexist** (current) | Read/write | Write-only (messages + facts) |
-| 1: Import | Read-only source | Import files as facts |
-| 2: Dual-write | Write continues | Read primary, file fallback |
-| 3: DB-primary | Read-only exports | Authoritative |
-
-Import existing memory:
-```bash
-bun run src/cli.ts import
-```
-
-Rollback at any phase: files are never modified or deleted.
-
-## Infrastructure
-
-The database is a Docker container defined in `docker-compose.yml`:
-
-- **Image:** `pgvector/pgvector:pg16` (PostgreSQL 16 + pgvector extension)
-- **Port:** 5433 (mapped from container 5432)
-- **Extensions:** `vector` (pgvector), `pg_trgm` (trigram fuzzy search)
-- **Indexes:** HNSW on all embedding tables, GIN on tsvector columns, GIN on trigram columns
-
-## Testing
-
-```bash
-# Integration smoke test
-bun run src/test-flow.ts
-
-# Full E2E test suite (requires running DB + OpenAI key)
-bun run src/test-e2e.ts
-
-# Everything bun test auto-discovers (*.test.ts): slug, redact, pi-capture, recall
+docker compose exec ira-memory-db createdb -U ira_memory ira_memory_test
+export IRA_TEST_DATABASE_URL="postgresql://ira_memory:<password>@localhost:5433/ira_memory_test"
+MEMORY_DATABASE_URL="$IRA_TEST_DATABASE_URL" bunx prisma migrate deploy
 bun test
+SMOKE_DATABASE_URL="$IRA_TEST_DATABASE_URL" bun run smoke
 ```
 
-The E2E suite tests 28 assertions across all phases: CRUD, embeddings, semantic search, summarization, tier management, sensitive detection, export, and compaction.
+CI runs the same steps on every pull request. See [docs/development.md](docs/development.md).
 
-The `*.test.ts` files use a plain assert-counter pattern rather than `bun:test`'s
-`test()`/`expect()` API (so `bun test`'s own pass/fail tally reads `0 pass, 0 fail` —
-that's cosmetic; each file prints its own real count). They still need
-`await main()` at module top level, not fire-and-forget — `bun test` moves on once a
-file's module body returns, so an unawaited async `main()` has its output silently
-dropped under `bun test` specifically, even though `bun run src/x.test.ts` runs it
-fine standalone (the process stays alive for the pending promise there). Found this
-the hard way once; if you add a new `*.test.ts` file, keep the `await`.
+## License
+
+Apache-2.0. See [LICENSE](LICENSE).
