@@ -27,7 +27,7 @@ Redaction runs before the embeddings call, so a redacted secret is not sent to t
 
 ## Redaction
 
-Redaction removes secret values from text before it is stored. It runs on pi transcripts and on any turn logged by a hook. It does not run on facts you save explicitly.
+Redaction removes secret values from text before it is stored. It runs on pi and Claude Code transcripts and on any turn logged by a hook. It does not run on facts you save explicitly.
 
 ### What is and isn't redacted
 
@@ -35,12 +35,12 @@ Redaction removes secret values from text before it is stored. It runs on pi tra
 |--------|--------------------------|
 | pi session transcripts (`/session/sync`) | Yes |
 | Turns logged by the Claude Code, Codex, and Antigravity hooks | Yes |
-| Claude Code transcripts (`capture` and the `SessionEnd` hook in `src/cc-capture.ts`) | **No**. This path does not call the redaction chain. |
+| Claude Code transcripts (`capture` and the `SessionEnd` hook in `src/cc-capture.ts`) | Yes |
 | Facts saved explicitly with `store`, `POST /memory`, or `memory_save` | **No** |
 
 Facts saved explicitly are stored as written. Do not save secrets with `memory_save`. The agent instructions in `integrations/AGENTS.md` say the same.
 
-The Claude Code path does not redact at import time, unlike the pi path. To clean up after the fact, run `redact-rescan`. It reruns the chain over every stored message, including Claude Code rows, and updates any row whose content changes. Run `detect-sensitive` as well to flag facts that match the sensitive patterns.
+Claude Code transcript capture runs the same batched redaction chain at import time as the pi path. To re-check messages that were stored earlier, run `redact-rescan`; it reruns the chain over every stored message, including Claude Code rows, and updates any row whose content changes. Run `detect-sensitive` as well to flag facts that match the sensitive patterns.
 
 ### The engine chain
 

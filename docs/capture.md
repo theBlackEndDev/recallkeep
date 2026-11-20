@@ -20,7 +20,7 @@ If the installer cannot find `bun` on its PATH, it stops with an error. Set `IRA
 
 ### What gets captured
 
-- All user and assistant messages. Tool calls are left out to reduce noise.
+- All user and assistant messages, redacted in a single batch through the redaction chain before storage. Tool calls are left out to reduce noise.
 - Session metadata: working directory, timestamp, and the Claude Code session ID.
 - An LLM-generated summary, written when the session closes.
 - Learnings, such as decisions, mistakes, and best practices.
@@ -101,7 +101,7 @@ The injection exists because a new session had no way to tell a settled decision
 
 ### Redaction
 
-Before any message is stored, its text is redacted. The redaction runs before the row is written and before the embedding is computed, so a secret never reaches the database or the embeddings API. All pending messages in one sync are redacted in a single batch. See [privacy.md](privacy.md#redaction) for the redaction engines and their limits.
+Before any message is stored (in both pi and Claude Code transcript capture), its text is redacted. The redaction runs before the row is written and before the embedding is computed, so a secret never reaches the database or the embeddings API. All pending messages in one sync or capture are redacted in a single batch. See [privacy.md](privacy.md#redaction) for the redaction engines and their limits.
 
 Redaction only runs at import time. If the redaction engines improve later, existing rows do not change on their own. Run `redact-rescan` to re-check stored rows. See [privacy.md](privacy.md#detect-sensitive-and-redact-rescan).
 
