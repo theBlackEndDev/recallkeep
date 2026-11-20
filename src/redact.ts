@@ -142,9 +142,10 @@ const GITLEAKS_ARGS = [
 // startup does NOT reliably affect subsequent spawn resolution (verified: it
 // doesn't). A bogus binary name sidesteps that entirely.
 export async function runScanner(binary: string, args: string[], input: string): Promise<RawFinding[] | null> {
-  let proc: ReturnType<typeof Bun.spawn>;
+  const spawn = () => Bun.spawn([binary, ...args], { stdin: "pipe", stdout: "pipe", stderr: "pipe" });
+  let proc: ReturnType<typeof spawn>;
   try {
-    proc = Bun.spawn([binary, ...args], { stdin: "pipe", stdout: "pipe", stderr: "pipe" });
+    proc = spawn();
   } catch {
     return null; // ENOENT — binary not installed
   }

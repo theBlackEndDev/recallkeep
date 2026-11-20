@@ -1,26 +1,54 @@
-// HTTP adapter exposing Friday-style memory API on 127.0.0.1:7775.
+// HTTP adapter exposing the memory API on 127.0.0.1:7775.
 // Maps /memory/* + /conversation/* onto ira-memory's Postgres store.
 // Keeps /entity/* and /kv/* in a bun:sqlite sidecar so ira-memory's
 // Prisma schema stays untouched.
 
 import { Database } from "bun:sqlite";
-import { mkdirSync } from "node:fs";
+import { timingSafeEqual } from "node:crypto";
+import { existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { prisma } from "./client.js";
 import { store, storeMessage, openSession, forget } from "./store.js";
 import { recall, textSearch, listFacts, recallMessages } from "./recall.js";
 import { deriveProjectSlug } from "./summarize.js";
-import { importPiSession, isSessionFileAllowed } from "./pi-capture.js";
+import { importPiSession, isSessionFileAllowed, SESSIONS_ROOT } from "./pi-capture.js";
 import type { MemoryCategory } from "./types.js";
 
 const PORT = Number(process.env.MEMORY_API_PORT ?? 7775);
 const HOST = process.env.MEMORY_API_HOST ?? "127.0.0.1";
 
+// ─── Access control ─────────────────────────────────────────────
+// IRA_API_TOKEN: when set, every route except /health needs
+// `Authorization: Bearer <token>`. Required when listening on a
+// non-loopback address, because the API has no other protection.
+const API_TOKEN = process.env.IRA_API_TOKEN ?? "";
+const LOOPBACK_HOSTS = new Set(["127.0.0.1", "::1", "localhost"]);
+const isLoopback = LOOPBACK_HOSTS.has(HOST);
+if (!isLoopback && !API_TOKEN) {
+  console.error(
+    `[memory-api] refusing to listen on ${HOST} without IRA_API_TOKEN. ` +
+      `Set a token, or leave MEMORY_API_HOST unset to stay on 127.0.0.1.`,
+  );
+  process.exit(1);
+}
+// IRA_CORS_ORIGINS: comma-separated browser origins allowed to call the API.
+// Empty by default: a web page you visit must not read or write your memory.
+const CORS_ORIGINS = new Set(
+  (process.env.IRA_CORS_ORIGINS ?? "").split(",").map((s) => s.trim()).filter(Boolean),
+);
+
 // ─── Sidecar DB for entities + kv ───────────────────────────────
-const sidecarDir = join(homedir(), ".claude");
-mkdirSync(sidecarDir, { recursive: true });
-const sidecar = new Database(join(sidecarDir, "memory-api-sidecar.db"));
+// IRA_SIDECAR_DB overrides the path. Installs from before 2026-11 kept it at
+// ~/.claude/memory-api-sidecar.db, which is still used when it exists.
+const LEGACY_SIDECAR = join(homedir(), ".claude", "memory-api-sidecar.db");
+const sidecarPath =
+  process.env.IRA_SIDECAR_DB ??
+  (existsSync(LEGACY_SIDECAR)
+    ? LEGACY_SIDECAR
+    : join(process.env.IRA_DATA_DIR ?? join(homedir(), ".ira-memory"), "sidecar.db"));
+mkdirSync(dirname(sidecarPath), { recursive: true });
+const sidecar = new Database(sidecarPath);
 sidecar.exec(`
   CREATE TABLE IF NOT EXISTS entities (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -75,15 +103,43 @@ async function getOrCreateSession(channel: string): Promise<string> {
 
 // ─── Helpers ────────────────────────────────────────────────────
 const json = (data: unknown, status = 200) =>
-  new Response(JSON.stringify(data), {
+  new Response(status === 204 ? null : JSON.stringify(data), {
     status,
-    headers: {
-      "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
-    },
+    headers: { "Content-Type": "application/json" },
   });
+
+function withCors(res: Response, origin: string | null): Response {
+  if (origin && CORS_ORIGINS.has(origin)) {
+    res.headers.set("Access-Control-Allow-Origin", origin);
+    res.headers.set("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
+    res.headers.set("Access-Control-Allow-Headers", "Content-Type,Authorization,X-Project,X-Cwd");
+    res.headers.set("Vary", "Origin");
+  }
+  return res;
+}
+
+// Rejects requests a browser page could forge: a foreign Origin (cross-site
+// fetch or form post) or, on loopback, a Host header that is not loopback
+// (DNS rebinding). Agents and hooks send neither header, so they pass.
+function rejectUntrusted(req: Request): Response | null {
+  const origin = req.headers.get("origin");
+  if (origin && !CORS_ORIGINS.has(origin)) return json({ error: "origin not allowed" }, 403);
+  if (isLoopback) {
+    const host = (req.headers.get("host") ?? "").replace(/:\d+$/, "").replace(/^\[|\]$/g, "");
+    if (host && !LOOPBACK_HOSTS.has(host)) return json({ error: "host not allowed" }, 403);
+  }
+  return null;
+}
+
+function unauthorized(req: Request, pathname: string): Response | null {
+  if (!API_TOKEN || pathname === "/health") return null;
+  const auth = req.headers.get("authorization") ?? "";
+  const given = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+  const a = Buffer.from(given);
+  const b = Buffer.from(API_TOKEN);
+  if (a.length === b.length && timingSafeEqual(a, b)) return null;
+  return json({ error: "unauthorized" }, 401);
+}
 
 const err = (msg: string, status = 400) => json({ error: msg }, status);
 
@@ -137,11 +193,20 @@ function serializeMessage(m: any) {
 
 // ─── Route handler ──────────────────────────────────────────────
 async function handle(req: Request): Promise<Response> {
+  const res = await route(req);
+  return withCors(res, req.headers.get("origin"));
+}
+
+async function route(req: Request): Promise<Response> {
   const url = new URL(req.url);
   const { pathname } = url;
   const method = req.method;
 
+  const blocked = rejectUntrusted(req);
+  if (blocked) return blocked;
   if (method === "OPTIONS") return json({}, 204);
+  const denied = unauthorized(req, pathname);
+  if (denied) return denied;
 
   try {
     // ── Health ──
@@ -243,7 +308,7 @@ async function handle(req: Request): Promise<Response> {
       // Trust boundary: this handler reads an arbitrary path off the
       // filesystem on request. Only pi's own session directory is allowed.
       if (!isSessionFileAllowed(body.sessionFile)) {
-        return err("sessionFile must be under ~/.pi/agent/sessions/", 403);
+        return err(`sessionFile must be under ${SESSIONS_ROOT}`, 403);
       }
       importPiSession({
         sessionFile: body.sessionFile,
@@ -428,4 +493,5 @@ const server = Bun.serve({
 });
 
 console.log(`[memory-api] listening on http://${server.hostname}:${server.port}`);
-console.log(`[memory-api] backend: ira-memory (Postgres) + sidecar sqlite`);
+console.log(`[memory-api] backend: ira-memory (Postgres) + sidecar sqlite at ${sidecarPath}`);
+if (API_TOKEN) console.log("[memory-api] bearer token required (IRA_API_TOKEN)");

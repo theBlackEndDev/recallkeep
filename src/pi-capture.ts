@@ -45,8 +45,16 @@ import { prisma } from "./client.js";
 import { deriveProjectSlug } from "./summarize.js";
 import { redactBatch } from "./redact.js";
 
-/** Only files under here may be imported — the sync endpoint reads whatever path it's given. */
-export const SESSIONS_ROOT = join(homedir(), ".pi", "agent", "sessions");
+/**
+ * Only files under here may be imported — the sync endpoint reads whatever path it's given.
+ * Follows pi's own overrides: PI_CODING_AGENT_SESSION_DIR, then PI_CODING_AGENT_DIR/sessions,
+ * then ~/.pi/agent/sessions. IRA_PI_SESSIONS_DIR wins over all of them.
+ */
+export const SESSIONS_ROOT = resolve(
+  process.env.IRA_PI_SESSIONS_DIR ??
+    process.env.PI_CODING_AGENT_SESSION_DIR ??
+    join(process.env.PI_CODING_AGENT_DIR ?? join(homedir(), ".pi", "agent"), "sessions"),
+);
 
 interface SessionHeader {
   type: "session";

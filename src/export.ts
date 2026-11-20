@@ -182,6 +182,17 @@ const BACKUP_DIR =
   process.env.IRA_BACKUP_DIR ??
   resolve(dirname(fileURLToPath(import.meta.url)), "..", "backups");
 
+// How to reach pg_dump/psql. IRA_DB_CONTAINER names a running container to
+// `docker exec` into. Otherwise this repo's docker-compose service is used,
+// whatever compose named the container.
+const PROJECT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+function dbExec(cmd: string, interactive = false): string {
+  const i = interactive ? "-i " : "";
+  const container = process.env.IRA_DB_CONTAINER;
+  if (container) return `docker exec ${i}${container} ${cmd}`;
+  return `docker compose -f "${join(PROJECT_ROOT, "docker-compose.yml")}" exec -T ira-memory-db ${cmd}`;
+}
+
 /**
  * Create a pg_dump backup of the ira_memory database.
  */
@@ -193,7 +204,7 @@ export async function backup(): Promise<string> {
   const filepath = join(BACKUP_DIR, filename);
 
   execSync(
-    `docker exec infrastructure-ira-memory-db-1 pg_dump -U ira_memory -d ira_memory > "${filepath}"`,
+    `${dbExec("pg_dump -U ira_memory -d ira_memory")} > "${filepath}"`,
     { stdio: "pipe" }
   );
 
@@ -205,7 +216,7 @@ export async function backup(): Promise<string> {
  */
 export async function restore(filepath: string): Promise<void> {
   execSync(
-    `cat "${filepath}" | docker exec -i infrastructure-ira-memory-db-1 psql -U ira_memory -d ira_memory`,
+    `cat "${filepath}" | ${dbExec("psql -U ira_memory -d ira_memory", true)}`,
     { stdio: "pipe" }
   );
 }
