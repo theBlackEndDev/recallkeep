@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "./client.js";
-import { semanticSearch } from "./search.js";
+import { semanticSearch, isToolMarker, isToolQuery } from "./search.js";
 import { generateEmbedding } from "./embed.js";
 import type {
   RecallInput,
@@ -14,6 +14,47 @@ import type {
   RecallMessagesInput,
   RecallMessagesResult,
 } from "./types.js";
+
+export { isToolMarker, isToolQuery };
+
+export interface ParsedSearchQuery {
+  /** Cleaned tokens with surrounding punctuation stripped, preserving internal `-`, `_`, `.`. */
+  tokens: string[];
+  /** Tokens containing `-`, `_`, or `.` (hyphenated, snake_case, dotted/version identifiers). */
+  identifierTokens: string[];
+  /** Query string for websearch_to_tsquery('english', ...) under AND semantics (textSearch). */
+  webAndQuery: string;
+  /** Query string for websearch_to_tsquery('english', ...) under OR semantics (recall / recallMessages). */
+  webOrQuery: string;
+}
+
+/** Escape `%`, `_`, and `\` for Postgres `ILIKE ... ESCAPE '\'`. */
+export function escapeIlike(token: string): string {
+  return token.replace(/[\\%_]/g, "\\$&");
+}
+
+/**
+ * Parse a user search query into cleaned tokens for `websearch_to_tsquery` plus
+ * identifier tokens (hyphenated, underscored, dotted) for an `ILIKE` trigram fallback.
+ *
+ * Why: stripping `[^\w]` before `to_tsquery` collapsed `MCP-LIVE-OK` into `MCPLIVEOK`,
+ * `ira-live` into `iralive`, and `v0.1.0` into `v010`, none of which exist in the stored
+ * `to_tsvector('english', content)` column (`'mcp-live-ok'`, `'ira-l'`, `'v0.1.0'`).
+ */
+export function parseSearchQuery(rawQuery: string): ParsedSearchQuery {
+  const tokens = rawQuery
+    .split(/[^\w.-]+/)
+    .map((t) => t.replace(/^[.-]+|[.-]+$/g, "").replace(/-{2,}/g, "-"))
+    .filter(Boolean);
+  const identifierTokens = tokens.filter((t) => /[-_.]/.test(t));
+  const ftsTokens = tokens.filter((t) => t.toLowerCase() !== "or");
+  return {
+    tokens,
+    identifierTokens,
+    webAndQuery: ftsTokens.join(" "),
+    webOrQuery: ftsTokens.join(" OR "),
+  };
+}
 
 /**
  * Ranking weights. Env-overridable so they can be swept by an eval harness against a second
@@ -89,24 +130,34 @@ export async function recall(input: RecallInput): Promise<RecallResult> {
   if (input.query) {
     // OR, not AND. Joining terms with `&` required EVERY word to appear in a single fact, so any
     // natural-phrase recall ("terminal mouse tracking garbled output tmux") matched nothing and the
-    // whole FTS layer silently no-opped. `|` lets partial matches through and leaves the ordering
-    // to ts_rank, which already scores facts matching more terms higher.
-    const tsQuery = input.query
-      .split(/\s+/)
-      .filter(Boolean)
-      .map((w) => w.replace(/[^\w]/g, ""))
-      .filter(Boolean)
-      .join(" | ");
+    // whole FTS layer silently no-opped. `OR` in websearch_to_tsquery lets partial matches through
+    // while tokenising hyphenated/dotted/underscored identifiers the same way to_tsvector does,
+    // paired with an ILIKE fallback on identifier tokens (backed by idx_memory_facts_content_trgm).
+    const { tokens, identifierTokens, webOrQuery } = parseSearchQuery(input.query);
 
-    if (tsQuery) {
+    if (tokens.length > 0) {
+      const ilikeOrClause =
+        identifierTokens.length > 0
+          ? Prisma.sql`(${Prisma.join(
+              identifierTokens.map((t) => Prisma.sql`content ILIKE ${`%${escapeIlike(t)}%`} ESCAPE '\\'`),
+              " OR ",
+            )})`
+          : Prisma.sql`false`;
+      const ftsMatchClause = webOrQuery
+        ? Prisma.sql`content_tsv @@ websearch_to_tsquery('english', ${webOrQuery})`
+        : Prisma.sql`false`;
+      const ftsRankExpr = webOrQuery
+        ? Prisma.sql`ts_rank(content_tsv, websearch_to_tsquery('english', ${webOrQuery}), 1)`
+        : Prisma.sql`0`;
+
       // Normalisation flag 1 divides the rank by 1 + log(document length). Without it, OR
       // semantics systematically favour long documents: a 1,800-char session digest matches more
       // incidental terms than a 90-char fact does, so verbose rows won every query regardless of
       // topic. Measured: this is what let novel-project facts top a query about shell escape codes.
       const ftsFacts = await prisma.$queryRaw<Array<{ id: string; rank: number }>>`
-        SELECT id, ts_rank(content_tsv, to_tsquery('english', ${tsQuery}), 1) as rank
+        SELECT id, GREATEST(${ftsRankExpr}, CASE WHEN ${ilikeOrClause} THEN 0.05 ELSE 0 END) as rank
         FROM memory_facts
-        WHERE content_tsv @@ to_tsquery('english', ${tsQuery})
+        WHERE (${ftsMatchClause} OR ${ilikeOrClause})
           AND is_archived = false
         ORDER BY rank DESC
         LIMIT ${limit}
@@ -292,20 +343,29 @@ export async function recallMessages(input: RecallMessagesInput): Promise<Recall
   const projectFilter = input.project ? Prisma.sql`AND s.metadata->>'project' = ${input.project}` : Prisma.empty;
   const channelFilter = input.channel ? Prisma.sql`AND s.channel = ${input.channel}` : Prisma.empty;
 
-  const tsQuery = input.query
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((w) => w.replace(/[^\w]/g, ""))
-    .filter(Boolean)
-    .join(" | "); // OR semantics — see recall()'s note above on why AND silently no-ops on natural phrases.
+  const { tokens, identifierTokens, webOrQuery } = parseSearchQuery(input.query); // OR semantics — see recall()'s note above on why AND silently no-ops on natural phrases.
 
   const ftsRank = new Map<string, number>();
-  if (tsQuery) {
+  if (tokens.length > 0) {
+    const ilikeOrClause =
+      identifierTokens.length > 0
+        ? Prisma.sql`(${Prisma.join(
+            identifierTokens.map((t) => Prisma.sql`m.content ILIKE ${`%${escapeIlike(t)}%`} ESCAPE '\\'`),
+            " OR ",
+          )})`
+        : Prisma.sql`false`;
+    const ftsMatchClause = webOrQuery
+      ? Prisma.sql`m.content_tsv @@ websearch_to_tsquery('english', ${webOrQuery})`
+      : Prisma.sql`false`;
+    const ftsRankExpr = webOrQuery
+      ? Prisma.sql`ts_rank(m.content_tsv, websearch_to_tsquery('english', ${webOrQuery}), 1)`
+      : Prisma.sql`0`;
+
     const rows = await prisma.$queryRaw<Array<{ id: string; rank: number }>>`
-      SELECT m.id, ts_rank(m.content_tsv, to_tsquery('english', ${tsQuery}), 1) as rank
+      SELECT m.id, GREATEST(${ftsRankExpr}, CASE WHEN ${ilikeOrClause} THEN 0.05 ELSE 0 END) as rank
       FROM messages m
       JOIN sessions s ON s.id = m.session_id
-      WHERE m.content_tsv @@ to_tsquery('english', ${tsQuery})
+      WHERE (${ftsMatchClause} OR ${ilikeOrClause})
         ${projectFilter} ${channelFilter}
       ORDER BY rank DESC
       LIMIT ${candidateTake}
@@ -315,22 +375,28 @@ export async function recallMessages(input: RecallMessagesInput): Promise<Recall
   }
 
   const semSim = new Map<string, number>();
+  const allowToolMarkers = isToolQuery(input.query);
   if (process.env.IRA_SEMANTIC_RECALL !== "0") {
     try {
       const queryVector = await generateEmbedding(input.query);
       if (queryVector.length) {
         const vectorStr = `[${queryVector.join(",")}]`;
+        const semanticFloor = Number(process.env.IRA_SEMANTIC_FLOOR ?? 0.33);
+        const shortRowFloor = Math.max(semanticFloor, 0.35);
+        const toolFilter = allowToolMarkers
+          ? Prisma.empty
+          : Prisma.sql`AND m.content NOT LIKE '→ %'`;
         const rows = await prisma.$queryRaw<Array<{ message_id: string; similarity: number }>>`
           SELECT message_id, MAX(similarity) AS similarity FROM (
-            SELECT me.message_id, 1 - (me.vector <=> ${vectorStr}::vector) AS similarity
+            SELECT me.message_id, 1 - (me.vector <=> ${vectorStr}::vector) AS similarity, LENGTH(m.content) AS content_len
             FROM message_embeddings me
             JOIN messages m ON m.id = me.message_id
             JOIN sessions s ON s.id = m.session_id
-            WHERE 1=1 ${projectFilter} ${channelFilter}
+            WHERE 1=1 ${projectFilter} ${channelFilter} ${toolFilter}
             ORDER BY me.vector <=> ${vectorStr}::vector
             LIMIT ${candidateTake}
           ) t
-          WHERE similarity > 0.3
+          WHERE similarity > CASE WHEN content_len < 200 THEN ${shortRowFloor} ELSE ${semanticFloor} END
           GROUP BY message_id
           ORDER BY similarity DESC
           LIMIT ${candidateTake}
@@ -345,10 +411,13 @@ export async function recallMessages(input: RecallMessagesInput): Promise<Recall
   const allIds = Array.from(new Set([...ftsRank.keys(), ...semSim.keys()]));
   if (allIds.length === 0) return { messages: [] };
 
-  const rows = await prisma.message.findMany({
+  const rawRows = await prisma.message.findMany({
     where: { id: { in: allIds } },
     include: { session: { select: { channel: true } } },
   });
+  const rows = allowToolMarkers
+    ? rawRows
+    : rawRows.filter((m) => ftsRank.has(m.id) || !isToolMarker(m.content));
 
   const now = Date.now();
   const scored = rows.map((m) => {
@@ -371,25 +440,34 @@ export async function textSearch(input: TextSearchInput): Promise<TextSearchResu
   const limit = input.limit ?? 20;
   const tables = input.tables ?? ["facts", "messages"];
 
-  const tsQuery = input.query
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((w) => w.replace(/[^\w]/g, ""))
-    .filter(Boolean)
-    .join(" & ");
+  const { tokens, identifierTokens, webAndQuery } = parseSearchQuery(input.query);
 
-  if (!tsQuery) {
+  if (tokens.length === 0) {
     return { facts: [], messages: [] };
   }
+
+  const ilikeAndClause =
+    identifierTokens.length > 0
+      ? Prisma.sql`(${Prisma.join(
+          tokens.map((t) => Prisma.sql`content ILIKE ${`%${escapeIlike(t)}%`} ESCAPE '\\'`),
+          " AND ",
+        )})`
+      : Prisma.sql`false`;
+  const ftsMatchClause = webAndQuery
+    ? Prisma.sql`content_tsv @@ websearch_to_tsquery('english', ${webAndQuery})`
+    : Prisma.sql`false`;
+  const ftsRankExpr = webAndQuery
+    ? Prisma.sql`ts_rank(content_tsv, websearch_to_tsquery('english', ${webAndQuery}))`
+    : Prisma.sql`0`;
 
   let facts: Array<MemoryFact & { rank: number }> = [];
   let messages: Array<Message & { rank: number }> = [];
 
   if (tables.includes("facts")) {
     const rawFacts = await prisma.$queryRaw<Array<{ id: string; rank: number }>>`
-      SELECT id, ts_rank(content_tsv, to_tsquery('english', ${tsQuery})) as rank
+      SELECT id, GREATEST(${ftsRankExpr}, CASE WHEN ${ilikeAndClause} THEN 0.05 ELSE 0 END) as rank
       FROM memory_facts
-      WHERE content_tsv @@ to_tsquery('english', ${tsQuery})
+      WHERE (${ftsMatchClause} OR ${ilikeAndClause})
         AND is_archived = false
       ORDER BY rank DESC
       LIMIT ${limit}
@@ -400,7 +478,7 @@ export async function textSearch(input: TextSearchInput): Promise<TextSearchResu
         where: { id: { in: rawFacts.map((f) => f.id) } },
       });
 
-      const rankMap = new Map(rawFacts.map((f) => [f.id, f.rank]));
+      const rankMap = new Map(rawFacts.map((f) => [f.id, Number(f.rank) || 0]));
       facts = fullFacts
         .map((f) => ({ ...f, rank: rankMap.get(f.id) ?? 0 }))
         .sort((a, b) => b.rank - a.rank);
@@ -409,9 +487,9 @@ export async function textSearch(input: TextSearchInput): Promise<TextSearchResu
 
   if (tables.includes("messages")) {
     const rawMessages = await prisma.$queryRaw<Array<{ id: string; rank: number }>>`
-      SELECT id, ts_rank(content_tsv, to_tsquery('english', ${tsQuery})) as rank
+      SELECT id, GREATEST(${ftsRankExpr}, CASE WHEN ${ilikeAndClause} THEN 0.05 ELSE 0 END) as rank
       FROM messages
-      WHERE content_tsv @@ to_tsquery('english', ${tsQuery})
+      WHERE (${ftsMatchClause} OR ${ilikeAndClause})
       ORDER BY rank DESC
       LIMIT ${limit}
     `;
@@ -421,7 +499,7 @@ export async function textSearch(input: TextSearchInput): Promise<TextSearchResu
         where: { id: { in: rawMessages.map((m) => m.id) } },
       });
 
-      const rankMap = new Map(rawMessages.map((m) => [m.id, m.rank]));
+      const rankMap = new Map(rawMessages.map((m) => [m.id, Number(m.rank) || 0]));
       messages = fullMessages
         .map((m) => ({ ...m, rank: rankMap.get(m.id) ?? 0 }))
         .sort((a, b) => b.rank - a.rank);

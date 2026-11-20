@@ -1,6 +1,24 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "./client.js";
 import { generateEmbedding } from "./embed.js";
 import type { MemoryFact, Message, Summary } from "./types.js";
+
+/**
+ * True when a message's content is a pi-capture tool-call marker (`→ toolName(...)`).
+ * Tool calls are stored as short marker rows for FTS lookup, not prose; in vector space
+ * they cluster near 0.30–0.33 cosine similarity against arbitrary/gibberish queries.
+ */
+export function isToolMarker(content: string): boolean {
+  return /^\s*→\s+\S+\(/.test(content);
+}
+
+/**
+ * True when the search query itself is asking for a tool call (starts with `→` or
+ * names a tool invocation like `bash(` / `tool call`).
+ */
+export function isToolQuery(query: string): boolean {
+  return /^\s*→|\btool[\s_-]*call\b|\b[a-z_][a-z0-9_]*\s*\(/i.test(query);
+}
 
 export interface SemanticSearchInput {
   query: string;
@@ -98,6 +116,9 @@ export async function semanticSearch(
 
   if (tables.includes("messages")) {
     let rawMessages: Array<{ message_id: string; similarity: number }>;
+    const toolFilter = isToolQuery(input.query)
+      ? Prisma.empty
+      : Prisma.sql`AND m.content NOT LIKE '→ %'`;
 
     if (input.channel) {
       rawMessages = await prisma.$queryRaw`
@@ -108,7 +129,7 @@ export async function semanticSearch(
           FROM message_embeddings me
           JOIN messages m ON m.id = me.message_id
           JOIN sessions s ON s.id = m.session_id
-          WHERE s.channel = ${input.channel}
+          WHERE s.channel = ${input.channel} ${toolFilter}
           ORDER BY me.vector <=> ${vectorStr}::vector
           LIMIT ${limit * 4}
         ) t
@@ -123,6 +144,8 @@ export async function semanticSearch(
         FROM (
           SELECT me.message_id, 1 - (me.vector <=> ${vectorStr}::vector) AS similarity
           FROM message_embeddings me
+          JOIN messages m ON m.id = me.message_id
+          WHERE 1=1 ${toolFilter}
           ORDER BY me.vector <=> ${vectorStr}::vector
           LIMIT ${limit * 4}
         ) t

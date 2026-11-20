@@ -17,6 +17,7 @@
 // satisfied by the full-text layer alone, so no OpenAI call is made.
 
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
+import { isToolMarker, isToolQuery } from "./search.js";
 
 const TEST_DB_URL = process.env.IRA_TEST_DATABASE_URL;
 if (TEST_DB_URL) {
@@ -26,10 +27,33 @@ if (TEST_DB_URL) {
   delete process.env.MEMORY_DATABASE_URL;
 }
 
+describe("isToolMarker / isToolQuery (pure helpers)", () => {
+  test("detects pi-capture tool-call marker rows starting with → toolName(", () => {
+    expect(isToolMarker('→ bash({"command":"ls -la"})')).toBe(true);
+    expect(isToolMarker('→ memory_search({"query":"Crossroads"})')).toBe(true);
+    expect(isToolMarker('  → read({"path":"/tmp/a.txt"})')).toBe(true);
+  });
+
+  test("does not flag normal prose or arrows mid-sentence", () => {
+    expect(isToolMarker("What is The Crossroads?")).toBe(false);
+    expect(isToolMarker("Timer fix confirmed working (countdown ticks 42m → 41m)")).toBe(false);
+    expect(isToolMarker("→ plain arrow bullet without tool call parens")).toBe(false);
+  });
+
+  test("identifies tool-oriented queries so explicit tool searches still match", () => {
+    expect(isToolQuery("→ bash")).toBe(true);
+    expect(isToolQuery("bash tool call")).toBe(true);
+    expect(isToolQuery('memory_search({"query":')).toBe(true);
+    expect(isToolQuery("What is The Crossroads?")).toBe(false);
+    expect(isToolQuery("zzznonexistentqueryzzz12345")).toBe(false);
+  });
+});
+
 describe.skipIf(!TEST_DB_URL)("recallMessages (needs IRA_TEST_DATABASE_URL)", () => {
   let recallMessages: typeof import("./recall.js").recallMessages;
   let prisma: typeof import("./client.js").prisma;
   let sessionId: string;
+  let toolMarkerId: string;
 
   beforeAll(async () => {
     ({ recallMessages } = await import("./recall.js"));
@@ -52,6 +76,16 @@ describe.skipIf(!TEST_DB_URL)("recallMessages (needs IRA_TEST_DATABASE_URL)", ()
         },
       ],
     });
+    const toolMarker = await prisma.message.create({
+      data: {
+        sessionId,
+        role: "assistant",
+        toolName: "bash",
+        content: '→ bash({"command":"cd /Users/dev/Projects/sample-novel && git status"})',
+        createdAt: new Date(t0 + 2000),
+      },
+    });
+    toolMarkerId = toolMarker.id;
   });
 
   afterAll(async () => {
@@ -107,5 +141,18 @@ describe.skipIf(!TEST_DB_URL)("recallMessages (needs IRA_TEST_DATABASE_URL)", ()
   test("no-match query returns empty array, not an error", async () => {
     const result = await recallMessages({ query: "zzznonexistentqueryzzz12345", project: "sample-novel", limit: 10 });
     expect(result.messages.length).toBe(0);
+  });
+
+  test("seeded tool-marker row is excluded by isToolMarker and does not leak into non-tool recall", async () => {
+    const row = await prisma.message.findUniqueOrThrow({ where: { id: toolMarkerId } });
+    expect(isToolMarker(row.content)).toBe(true);
+    expect(isToolQuery("zzznonexistentqueryzzz12345")).toBe(false);
+    const result = await recallMessages({ query: "zzznonexistentqueryzzz12345", project: "sample-novel", limit: 10 });
+    expect(result.messages.some((m) => m.id === toolMarkerId)).toBe(false);
+  });
+
+  test("hyphenated token in message (deal-making) is matched by recallMessages", async () => {
+    const result = await recallMessages({ query: "deal-making", project: "sample-novel", limit: 10 });
+    expect(result.messages.some((m) => m.content.includes("deal-making"))).toBe(true);
   });
 });
