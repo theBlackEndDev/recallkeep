@@ -3,13 +3,15 @@ services:
     image: pgvector/pgvector:pg16
     restart: unless-stopped
     ports:
-      - "5433:5432"
+      # Loopback only: the default password is public, so never publish this on the LAN.
+      - "127.0.0.1:${IRA_DB_PORT:-5433}:5432"
+      - "[::1]:${IRA_DB_PORT:-5433}:5432"
     volumes:
       - ira-memory-db-data:/var/lib/postgresql/data
     environment:
       POSTGRES_DB: ira_memory
       POSTGRES_USER: ira_memory
-      POSTGRES_PASSWORD: ira_memory_secret
+      POSTGRES_PASSWORD: ${IRA_DB_PASSWORD:-ira_memory_secret}
     healthcheck:
       test: pg_isready -U ira_memory -d ira_memory
       interval: 10s

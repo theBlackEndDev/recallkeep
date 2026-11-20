@@ -1,6 +1,20 @@
 {
   "name": "ira-memory",
   "version": "0.1.0",
+  "private": true,
+  "description": "Long-term memory for AI coding agents: Postgres + pgvector, an HTTP API, an MCP server, and capture hooks for pi, Claude Code, Codex CLI and Antigravity CLI.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/theBlackEndDev/ira-memory.git"
+  },
+  "homepage": "https://github.com/theBlackEndDev/ira-memory#readme",
+  "bugs": {
+    "url": "https://github.com/theBlackEndDev/ira-memory/issues"
+  },
+  "engines": {
+    "bun": ">=1.2.0"
+  },
   "type": "module",
   "scripts": {
     "dev": "bun run src/cli.ts",
@@ -11,7 +25,9 @@
     "db:generate": "bunx prisma generate",
     "db:studio": "bunx prisma studio",
     "redact-rescan": "bun run src/redact-rescan.ts",
-    "test": "bun test"
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "smoke": "bun scripts/smoke.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.7.0",

@@ -1,0 +1,42 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: ira_memory_test
+          POSTGRES_USER: ira_memory
+          POSTGRES_PASSWORD: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ira_memory -d ira_memory_test"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      MEMORY_DATABASE_URL: postgresql://ira_memory:ci@localhost:5432/ira_memory_test
+      IRA_TEST_DATABASE_URL: postgresql://ira_memory:ci@localhost:5432/ira_memory_test
+      SMOKE_DATABASE_URL: postgresql://ira_memory:ci@localhost:5432/ira_memory_test
+      IRA_LLM_PROVIDER: none
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.10
+      - run: bun install --frozen-lockfile
+      - run: bunx prisma generate
+      - run: bunx prisma migrate deploy
+      - run: bun run typecheck
+      - run: bun test
+      - run: bun scripts/smoke.ts

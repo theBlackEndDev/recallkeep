@@ -20,8 +20,8 @@
  *
  * EMBED_DIMS defaults to 1536 — the pgvector schema (vector(1536)). text-embedding-3-small and
  * gemini-embedding-001 can BOTH emit 1536 dims (we pass `dimensions`), so neither needs a schema
- * change. A model with a different fixed size (e.g. Ollama nomic-embed-text = 768) requires either
- * IRA_EMBED=off, or setting IRA_EMBED_DIMS=768 AND migrating the *_embeddings columns on a fresh DB.
+ * change. A smaller fixed-size model (e.g. Ollama nomic-embed-text = 768) is zero-padded to fit (see
+ * fitToSchema in embed.ts). A larger one needs IRA_EMBED_DIMS plus a migration on a fresh DB.
  */
 import OpenAI from "openai";
 

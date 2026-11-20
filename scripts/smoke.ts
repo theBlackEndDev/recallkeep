@@ -34,7 +34,7 @@ const env: Record<string, string> = {
   MEMORY_API_PORT: String(port),
   MEMORY_API_HOST: "127.0.0.1",
   IRA_LLM_PROVIDER: "none",
-  IRA_AUTO_LEARN: "0",
+  IRA_AUTO_LEARN: "false",
 };
 const token = process.env.SMOKE_API_TOKEN;
 if (token) env.IRA_API_TOKEN = token;

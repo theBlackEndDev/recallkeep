@@ -16,7 +16,23 @@ export async function generateEmbedding(text: string): Promise<number[]> {
     input: text.slice(0, CHUNK_CHARS),
     ...(EMBED_SUPPORTS_DIMENSIONS ? { dimensions: EMBED_DIMS } : {}),
   });
-  return response.data[0].embedding;
+  return fitToSchema(response.data[0].embedding);
+}
+
+/**
+ * Zero-pad a shorter vector to EMBED_DIMS so fixed-size local models (Ollama nomic-embed-text
+ * emits 768) fit the vector(1536) columns without a migration. Padding with zeros changes neither
+ * dot products nor norms, so cosine similarity between two padded vectors is exactly the original.
+ * Vectors from different models are still not comparable; don't switch models on a populated DB.
+ */
+export function fitToSchema(vec: number[], dims = EMBED_DIMS): number[] {
+  if (vec.length === dims) return vec;
+  if (vec.length > dims) {
+    throw new Error(
+      `embedding has ${vec.length} dims but the schema holds ${dims}; pick a smaller model or set IRA_EMBED_DIMS on a fresh DB`,
+    );
+  }
+  return vec.concat(new Array(dims - vec.length).fill(0));
 }
 
 /**
