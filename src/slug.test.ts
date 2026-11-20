@@ -8,58 +8,77 @@
 // package between the two repos — if you change the algorithm here, change
 // it there too, and re-run both.
 
+import { test, expect } from "bun:test";
 import { deriveProjectSlug } from "./summarize.js";
 
-let pass = 0;
-let fail = 0;
-const check = (name: string, got: unknown, want: unknown) => {
-  if (got === want) {
-    pass++;
-  } else {
-    fail++;
-    console.log(`FAIL ${name}: got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
-  }
-};
-
 // --- nested paths collapse to the project root ---
-check("nested path collapses to project root", deriveProjectSlug("/Users/dev/Projects/ira-memory/src/db"), "ira-memory");
-check("project root, no trailing slash", deriveProjectSlug("/Users/dev/Projects/ira-memory"), "ira-memory");
-check("project root, trailing slash", deriveProjectSlug("/Users/dev/Projects/ira-memory/"), "ira-memory");
+test("nested path collapses to project root", () => {
+  expect(deriveProjectSlug("/home/dev/Projects/ira-memory/src/db")).toBe("ira-memory");
+});
+test("project root, no trailing slash", () => {
+  expect(deriveProjectSlug("/home/dev/Projects/ira-memory")).toBe("ira-memory");
+});
+test("project root, trailing slash", () => {
+  expect(deriveProjectSlug("/home/dev/Projects/ira-memory/")).toBe("ira-memory");
+});
 
 // --- Projects root catch-all — deliberate, not a bug (plan D2) ---
-check("Projects root, absolute", deriveProjectSlug("/Users/dev/Projects"), "Projects");
-check("Projects root, trailing slash", deriveProjectSlug("/Users/dev/Projects/"), "Projects");
-check("Projects root, tilde", deriveProjectSlug("~/Projects"), "Projects");
-check("Projects root works for ANY home dir — no hardcode", deriveProjectSlug("/home/otheruser/Projects"), "Projects");
-check("server layout root, lowercase", deriveProjectSlug("/srv/projects"), "Projects");
+test("Projects root, absolute", () => {
+  expect(deriveProjectSlug("/home/dev/Projects")).toBe("Projects");
+});
+test("Projects root, trailing slash", () => {
+  expect(deriveProjectSlug("/home/dev/Projects/")).toBe("Projects");
+});
+test("Projects root, tilde", () => {
+  expect(deriveProjectSlug("~/Projects")).toBe("Projects");
+});
+test("Projects root works for ANY home dir — no hardcode", () => {
+  expect(deriveProjectSlug("/home/otheruser/Projects")).toBe("Projects");
+});
+test("server layout root, lowercase", () => {
+  expect(deriveProjectSlug("/srv/projects")).toBe("Projects");
+});
 
 // --- server layout, lowercase segment ---
-check("lowercase nested segment (server layout)", deriveProjectSlug("/srv/projects/widget-api/src"), "widget-api");
+test("lowercase nested segment (server layout)", () => {
+  expect(deriveProjectSlug("/srv/projects/widget-api/src")).toBe("widget-api");
+});
 
 // --- outside-Projects fallback (Phase 1, plan D2/D6) ---
-check("outside Projects falls back to basename, not null", deriveProjectSlug("/Users/dev/.pi/agent/extensions/memory"), "memory");
-check("bare home dir falls back to its basename", deriveProjectSlug("/Users/dev"), "dev");
-check("false-positive guard: 'MyProjects' is not 'Projects'", deriveProjectSlug("/Users/dev/MyProjects"), "MyProjects");
+test("outside Projects falls back to basename, not null", () => {
+  expect(deriveProjectSlug("/home/dev/.pi/agent/extensions/memory")).toBe("memory");
+});
+test("bare home dir falls back to its basename", () => {
+  expect(deriveProjectSlug("/home/dev")).toBe("dev");
+});
+test("false-positive guard: 'MyProjects' is not 'Projects'", () => {
+  expect(deriveProjectSlug("/home/dev/MyProjects")).toBe("MyProjects");
+});
 
 // --- null/empty only ---
-check("null cwd returns null", deriveProjectSlug(null), null);
-check("undefined cwd returns null", deriveProjectSlug(undefined), null);
-check("empty string returns null", deriveProjectSlug(""), null);
+test("null cwd returns null", () => {
+  expect(deriveProjectSlug(null)).toBe(null);
+});
+test("undefined cwd returns null", () => {
+  expect(deriveProjectSlug(undefined)).toBe(null);
+});
+test("empty string returns null", () => {
+  expect(deriveProjectSlug("")).toBe(null);
+});
 
 // --- parity fixtures shared with the pi extension's slug.test.ts ---
 const PARITY_FIXTURES: Array<[cwd: string, slug: string | null]> = [
-  ["/Users/dev/Projects/ira-memory/src/db", "ira-memory"],
-  ["/Users/dev/Projects/ira-memory", "ira-memory"],
-  ["/Users/dev/Projects", "Projects"],
+  ["/home/dev/Projects/ira-memory/src/db", "ira-memory"],
+  ["/home/dev/Projects/ira-memory", "ira-memory"],
+  ["/home/dev/Projects", "Projects"],
   ["~/Projects/", "Projects"],
   ["/srv/projects/widget-api", "widget-api"],
-  ["/Users/dev/.pi/agent/extensions/memory", "memory"],
-  ["/Users/dev/MyProjects", "MyProjects"],
+  ["/home/dev/.pi/agent/extensions/memory", "memory"],
+  ["/home/dev/MyProjects", "MyProjects"],
   ["", null],
 ];
 for (const [cwd, want] of PARITY_FIXTURES) {
-  check(`parity fixture: ${JSON.stringify(cwd)}`, deriveProjectSlug(cwd), want);
+  test(`parity fixture: ${JSON.stringify(cwd)}`, () => {
+    expect(deriveProjectSlug(cwd)).toBe(want);
+  });
 }
-
-console.log(`\n${pass} passed, ${fail} failed`);
-if (fail) process.exit(1);
