@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "ira-memory",
+      "name": "recallkeep",
       "dependencies": {
         "@modelcontextprotocol/sdk": "1",
         "@prisma/client": "^6.7.0",
