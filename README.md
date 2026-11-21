@@ -91,8 +91,8 @@ CLI**. Several agents can share one memory, so a decision made in Claude Code is
 You need:
 
 - [Bun](https://bun.sh) 1.2 or newer.
-- [Docker](https://docs.docker.com/get-docker/) to run Postgres with pgvector. Any Postgres 16 with the
-  `vector` and `pg_trgm` extensions also works. Point `RECALLKEEP_DATABASE_URL` at it.
+- Postgres 16 or newer with the `vector` and `pg_trgm` extensions. The quickstart runs it with
+  [Docker](https://docs.docker.com/get-docker/). To use your own Postgres instead, see [Without Docker](#without-docker).
 - Optional: an OpenAI or Gemini API key, or [Ollama](https://ollama.com), for semantic search and summaries.
   Without one, RecallKeep still works, and search uses full text and project tags.
 
@@ -219,14 +219,49 @@ Cursor, Windsurf, Cline, VS Code and others can start the same server. Use comma
 
 ### Run it in the background
 
-`scripts/start.sh` waits for Docker, starts Postgres, applies migrations and runs the API. Service templates
-call it:
+`scripts/start.sh` starts Postgres with Docker (or, [without Docker](#without-docker), waits for your own
+Postgres), applies migrations and runs the API. Service templates call it:
 
 - **macOS:** [`deploy/launchd/dev.recallkeep.plist`](deploy/launchd/dev.recallkeep.plist)
 - **Linux:** [`deploy/systemd/recallkeep.service`](deploy/systemd/recallkeep.service)
 
 Each file explains in its header how to install it. To update later, run `bun run update`. It pulls,
 installs, migrates and restarts the service.
+
+### Without Docker
+
+RecallKeep only needs a Postgres it can reach through `RECALLKEEP_DATABASE_URL`. A native install, a
+server on your network or a managed database all work. The database must be Postgres 16 or newer with the
+[pgvector](https://github.com/pgvector/pgvector) extension installed. `pg_trgm` ships with Postgres.
+
+1. Create a user and a database, then create the two extensions as a superuser. `vector` is not a trusted
+   extension, so the migrations can't create it with an ordinary user:
+
+   ```sql
+   CREATE ROLE recallkeep LOGIN PASSWORD 'choose-a-password';
+   CREATE DATABASE recallkeep OWNER recallkeep;
+   \c recallkeep
+   CREATE EXTENSION vector;
+   CREATE EXTENSION pg_trgm;
+   ```
+
+2. Point `.env` at it. Percent-encode special characters in the password (`@` is `%40`, `:` is `%3A`,
+   `/` is `%2F`):
+
+   ```bash
+   RECALLKEEP_DATABASE_URL="postgresql://recallkeep:choose-a-password@localhost:5432/recallkeep"
+   ```
+
+3. Skip `docker compose up -d` in the quickstart. Run the rest as written.
+
+`scripts/start.sh` decides whether to use Docker from the URL. It uses Docker only when the URL points at
+this machine on the port `docker-compose.yml` publishes (`RECALLKEEP_DB_PORT`, default `5433`). Otherwise it
+waits until your database accepts connections. Set `RECALLKEEP_USE_DOCKER=0` or `1` to decide it yourself.
+
+`backup` and `restore` then run `pg_dump` and `psql` on this machine, so install the PostgreSQL client
+tools (macOS: `brew install libpq`, Debian and Ubuntu: `apt install postgresql-client`). Their version must
+be the same as the server's or newer. If they aren't on `PATH`, set `RECALLKEEP_PG_DUMP` and
+`RECALLKEEP_PSQL` to their full paths.
 
 ## How it works
 

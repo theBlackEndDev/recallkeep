@@ -1,8 +1,10 @@
-import { execSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
+import { closeSync, openSync, rmSync } from "node:fs";
 import { writeFile, mkdir } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { prisma } from "./client.js";
+import { dumpPlan, restorePlan, type CommandPlan, type Env } from "./db-target.js";
 import type { MemoryFact } from "./types.js";
 
 // ─── Sensitive content detection ────────────────────────────────
@@ -182,41 +184,61 @@ const BACKUP_DIR =
   process.env.RECALLKEEP_BACKUP_DIR ??
   resolve(dirname(fileURLToPath(import.meta.url)), "..", "backups");
 
-// How to reach pg_dump/psql. RECALLKEEP_DB_CONTAINER names a running container to
-// `docker exec` into. Otherwise this repo's docker-compose service is used,
-// whatever compose named the container.
-const PROJECT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-function dbExec(cmd: string, interactive = false): string {
-  const i = interactive ? "-i " : "";
-  const container = process.env.RECALLKEEP_DB_CONTAINER;
-  if (container) return `docker exec ${i}${container} ${cmd}`;
-  return `docker compose -f "${join(PROJECT_ROOT, "docker-compose.yml")}" exec -T db ${cmd}`;
+// How to reach pg_dump/psql is decided in db-target.ts. In short: against this repo's
+// docker-compose database they run inside the container (RECALLKEEP_DB_CONTAINER names a
+// different container). Against a Postgres you run yourself they run on this machine, so
+// the PostgreSQL client tools must be installed (RECALLKEEP_PG_DUMP and RECALLKEEP_PSQL
+// set their full paths when they are not on PATH).
+const COMPOSE_FILE = join(resolve(dirname(fileURLToPath(import.meta.url)), ".."), "docker-compose.yml");
+
+/** Run a planned command with one end tied to a file. Returns stderr text on failure, null on success. */
+function runPlanned(plan: CommandPlan, io: { stdin?: number; stdout?: number }): string | null {
+  const r = spawnSync(plan.cmd, plan.args, {
+    env: { ...process.env, ...plan.env },
+    stdio: [io.stdin ?? "ignore", io.stdout ?? "pipe", "pipe"],
+  });
+  if (r.error) {
+    const missing = (r.error as NodeJS.ErrnoException).code === "ENOENT";
+    return missing ? plan.missingHint : String(r.error.message);
+  }
+  if (r.status !== 0) return (r.stderr?.toString() || `exited with status ${r.status}`).trim().split("\n").slice(-5).join("\n");
+  return null;
 }
 
 /**
  * Create a pg_dump backup of the recallkeep database.
  */
-export async function backup(): Promise<string> {
+export async function backup(env: Env = process.env): Promise<string> {
   await mkdir(BACKUP_DIR, { recursive: true });
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   const filename = `recallkeep-${timestamp}.sql`;
   const filepath = join(BACKUP_DIR, filename);
 
-  execSync(
-    `${dbExec("pg_dump -U recallkeep -d recallkeep")} > "${filepath}"`,
-    { stdio: "pipe" }
-  );
-
+  const fd = openSync(filepath, "w");
+  let failure: string | null;
+  try {
+    failure = runPlanned(dumpPlan(env, COMPOSE_FILE), { stdout: fd });
+  } finally {
+    closeSync(fd);
+  }
+  if (failure) {
+    rmSync(filepath, { force: true }); // never leave a half-written backup that looks real
+    throw new Error(`backup failed: ${failure}`);
+  }
   return filepath;
 }
 
 /**
  * Restore from a pg_dump file.
  */
-export async function restore(filepath: string): Promise<void> {
-  execSync(
-    `cat "${filepath}" | ${dbExec("psql -U recallkeep -d recallkeep", true)}`,
-    { stdio: "pipe" }
-  );
+export async function restore(filepath: string, env: Env = process.env): Promise<void> {
+  const fd = openSync(filepath, "r");
+  let failure: string | null;
+  try {
+    failure = runPlanned(restorePlan(env, COMPOSE_FILE), { stdin: fd });
+  } finally {
+    closeSync(fd);
+  }
+  if (failure) throw new Error(`restore failed: ${failure}`);
 }
