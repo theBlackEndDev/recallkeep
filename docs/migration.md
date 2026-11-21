@@ -73,6 +73,7 @@ Where the commands run:
 
 - By default, `backup` and `restore` run `pg_dump` and `psql` inside this repo's `db` compose service, using `docker compose exec`. The database must be running.
 - To use a different container, set `RECALLKEEP_DB_CONTAINER` to its name. The commands then use `docker exec` on that container.
+- With your own Postgres and no Docker (see the README, "Without Docker"), they run `pg_dump` and `psql` on this machine against `RECALLKEEP_DATABASE_URL`. Install the PostgreSQL client tools, or set `RECALLKEEP_PG_DUMP` and `RECALLKEEP_PSQL` to their paths. These backups leave out owners and grants, so they restore into a database owned by a different user.
 - The backup directory defaults to `backups/` in the repo. Set `RECALLKEEP_BACKUP_DIR` to change it.
 
 Backup files contain all your memory, including any sensitive facts. Keep them private. `backups/` and `*.dump` are in `.gitignore`.

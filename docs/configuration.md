@@ -57,6 +57,7 @@ Variables are grouped the same way as in `.env.example`.
 | `RECALLKEEP_DATABASE_URL` | PostgreSQL connection string. **Required.** | `postgresql://recallkeep:<password>@localhost:5433/recallkeep` |
 | `RECALLKEEP_DB_PORT` | Host port that docker-compose publishes. Bound to loopback only. | `5433` |
 | `RECALLKEEP_DB_PASSWORD` | Password for the compose container (`POSTGRES_PASSWORD`). Keep it in sync with the URL above. | `recallkeep_secret` in `docker-compose.yml` |
+| `RECALLKEEP_USE_DOCKER` | `1` uses the compose service, `0` never uses Docker. Unset means Docker is used only when the URL points at this machine on `RECALLKEEP_DB_PORT`. Affects `scripts/start.sh`, `backup` and `restore`. | unset |
 | `RECALLKEEP_TEST_DATABASE_URL` | Throwaway, migrated database. Enables the DB tests in `bun test`. See [development.md](development.md#running-the-tests). | unset |
 | `SMOKE_DATABASE_URL` | Throwaway, migrated database for `bun scripts/smoke.ts`. See [development.md](development.md#running-the-tests). | unset |
 
@@ -99,6 +100,8 @@ See [privacy.md](privacy.md#network-exposure) for what these defaults protect ag
 | `RECALLKEEP_SIDECAR_DB` | Explicit path to the sidecar SQLite file. Overrides `RECALLKEEP_DATA_DIR`. | `~/.recallkeep/sidecar.db` |
 | `RECALLKEEP_BACKUP_DIR` | Directory where `backup` writes dumps and `restore` reads them | `<repo>/backups` |
 | `RECALLKEEP_DB_CONTAINER` | Running container that `backup` and `restore` `docker exec` into. Unset means this repo's compose service is used. | unset |
+| `RECALLKEEP_PG_DUMP` | Without Docker: path to `pg_dump` for `backup` | `pg_dump` on `PATH` |
+| `RECALLKEEP_PSQL` | Without Docker: path to `psql` for `restore` | `psql` on `PATH` |
 
 The sidecar file is `~/.recallkeep/sidecar.db`. Older installs used `~/.claude/memory-api-sidecar.db`. The server keeps using that legacy file when it exists, so existing entities and key-value data stay where they are.
 
